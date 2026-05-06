@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>数学刷题系统</title>
+    <style>
+        body{background:#f5f7fa;font-family:Arial;padding:20px;}
+        .box{max-width:500px;margin:0 auto;background:white;padding:25px;border-radius:16px;text-align:center;}
+        .btn{display:block;background:#2c52ed;color:white;padding:14px;margin:10px 0;border-radius:10px;text-decoration:none;}
+        input{width:100%;padding:10px;margin:8px 0;box-sizing:border-box;}
+        button{width:100%;padding:12px;background:#2c52ed;color:white;border:none;border-radius:8px;}
+        .item{background:#f5f5f5;padding:16px;margin:10px 0;border-radius:12px;text-align:left;}
+        a{color:#2c52ed;text-decoration:none;}
+    </style>
+</head>
+<body>
+    <div class="box" id="app">
+        <h2>数学提分刷题系统</h2>
+        <a href="#" class="btn" onclick="showLogin()">学生登录</a>
+        <a href="#" class="btn" onclick="showRegister()">学生注册</a>
+        <a href="#" class="btn" onclick="showAdmin()">教师后台</a>
+    </div>
+
+    <script>
+        let users = JSON.parse(localStorage.getItem('users')) || [];
+        let papers = JSON.parse(localStorage.getItem('papers')) || [];
+        let questions = JSON.parse(localStorage.getItem('questions')) || [];
+        let currentUser = null;
+        const ADMIN_PASS = "123456";
+
+        function renderHome(){document.getElementById('app').innerHTML=`<h2>数学提分刷题系统</h2><a href="#" class="btn" onclick="showLogin()">学生登录</a><a href="#" class="btn" onclick="showRegister()">学生注册</a><a href="#" class="btn" onclick="showAdmin()">教师后台</a>`}
+        function showLogin(){document.getElementById('app').innerHTML=`<h3>学生登录</h3><input id="loginUser" placeholder="账号"><input type="password" id="loginPwd" placeholder="密码"><button onclick="login()">登录</button><br><a href="#" onclick="renderHome()">返回</a>`}
+        function login(){let u=document.getElementById('loginUser').value,p=document.getElementById('loginPwd').value;if(users.find(x=>x.username===u&&x.password===p)){currentUser=u;renderPapers()}else alert('账号密码错误')}
+        function showRegister(){document.getElementById('app').innerHTML=`<h3>学生注册</h3><input id="regUser" placeholder="账号"><input type="password" id="regPwd" placeholder="密码"><input id="regName" placeholder="姓名"><input id="regGrade" placeholder="年级"><button onclick="register()">注册</button><br><a href="#" onclick="renderHome()">返回</a>`}
+        function register(){let u=document.getElementById('regUser').value,p=document.getElementById('regPwd').value,n=document.getElementById('regName').value,g=document.getElementById('regGrade').value;if(users.find(x=>x.username===u))return alert('账号已存在');users.push({username:u,password:p,name:n,grade:g});localStorage.users=JSON.stringify(users);alert('注册成功');showLogin()}
+        function showAdmin(){document.getElementById('app').innerHTML=`<h3>教师登录</h3><input type="password" id="adminPwd" placeholder="管理员密码"><button onclick="adminLogin()">登录</button><br><a href="#" onclick="renderHome()">返回</a>`}
+        function adminLogin(){let p=document.getElementById('adminPwd').value;if(p===ADMIN_PASS)renderAdmin();else alert('密码错误')}
+        function renderAdmin(){document.getElementById('app').innerHTML=`<h3>教师管理后台</h3><a href="#" class="btn" onclick="createPaper()">创建试卷</a><a href="#" class="btn" onclick="renderPaperList()">管理试卷</a><a href="#" class="btn" onclick="renderHome()">返回首页</a>`}
+        function createPaper(){let t=prompt('输入试卷名称');if(!t)return;papers.push({id:Date.now(),title:t});localStorage.papers=JSON.stringify(papers);renderPaperList()}
+        function renderPaperList(){let h=`<h3>试卷列表</h3>`;papers.forEach(p=>{h+=`<div class="item"><b>${p.title}</b><br><a href="#" onclick="addQuestion(${p.id})">添加题目</a><a href="#" onclick="delPaper(${p.id})" style="color:red;margin-left:10px;">删除</a></div>`});h+=`<br><a href="#" onclick="renderAdmin()">返回</a>`;document.getElementById('app').innerHTML=h}
+        function addQuestion(pid){let c=prompt('题目（用___做填空）'),a=prompt('标准答案');if(!c||!a)return;questions.push({id:Date.now(),paper_id:pid,content:c,answer:a});localStorage.questions=JSON.stringify(questions);alert('添加成功');renderPaperList()}
+        function delPaper(pid){if(!confirm('确定删除？'))return;papers=papers.filter(p=>p.id!==pid);questions=questions.filter(q=>q.paper_id!==pid);localStorage.papers=JSON.stringify(papers);localStorage.questions=JSON.stringify(questions);renderPaperList()}
+        function renderPapers(){let h=`<h3>我的试卷</h3>`;papers.forEach(p=>{h+=`<div class="item"><b>${p.title}</b><br><a href="#" class="btn" onclick="doPaper(${p.id})">开始答题</a></div>`});h+=`<br><a href="#" onclick="currentUser=null;renderHome()">退出登录</a>`;document.getElementById('app').innerHTML=h}
+        function doPaper(pid){let qs=questions.filter(q=>q.paper_id===pid);if(qs.length===0)return alert('暂无题目');let h=`<h3>开始答题</h3>`;qs.forEach((q,i)=>{h+=`<div class="item"><p>${q.content}</p><input id="ans${i}" placeholder="输入答案" style="width:100%;"></div>`});h+=`<button onclick="submitPaper(${pid})">提交批改</button>`;document.getElementById('app').innerHTML=h}
+        function submitPaper(pid){let qs=questions.filter(q=>q.paper_id===pid),right=0;qs.forEach((q,i)=>{let a=document.getElementById(`ans${i}`).value.trim();if(a===q.answer.trim())right++});let s=Math.round(right/qs.length*100);alert(`得分：${s}分\n答对：${right}题\n答错：${qs.length-right}题`);renderPapers()}
+        renderHome();
+    </script>
+</body>
+</html>
