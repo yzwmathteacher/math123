@@ -2,48 +2,292 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>数学刷题系统</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全科智能刷题系统</title>
     <style>
-        body{background:#f5f7fa;font-family:Arial;padding:20px;}
-        .box{max-width:500px;margin:0 auto;background:white;padding:25px;border-radius:16px;text-align:center;}
-        .btn{display:block;background:#2c52ed;color:white;padding:14px;margin:10px 0;border-radius:10px;text-decoration:none;}
-        input{width:100%;padding:10px;margin:8px 0;box-sizing:border-box;}
-        button{width:100%;padding:12px;background:#2c52ed;color:white;border:none;border-radius:8px;}
-        .item{background:#f5f5f5;padding:16px;margin:10px 0;border-radius:12px;text-align:left;}
-        a{color:#2c52ed;text-decoration:none;}
+        *{box-sizing:border-box}
+        body{background:#f5f7fa;margin:0;padding:15px;font-family:Arial,"微软雅黑"}
+        .container{max-width:500px;margin:0 auto}
+        .card{background:white;border-radius:16px;padding:25px;margin:15px 0;box-shadow:0 2px 10px #00000010}
+        .title{text-align:center;font-size:22px;font-weight:bold;margin-bottom:20px;color:#2c52ed}
+        input{width:100%;padding:12px;margin:8px 0;border:1px solid #ddd;border-radius:8px;font-size:15px}
+        button{width:100%;padding:13px;background:#2c52ed;color:white;border:none;border-radius:8px;font-size:16px;margin-top:5px}
+        .btn-outline{background:white;color:#2c52ed;border:1px solid #2c52ed}
+        .text-center{text-align:center}
+        .mt10{margin-top:10px}
+        .red{color:red}
+        .tip{font-size:12px;color:#666;margin-top:5px}
+        .pay-qrcode{width:200px;border-radius:8px;margin:10px auto;display:block}
     </style>
 </head>
 <body>
-    <div class="box" id="app">
-        <h2>数学提分刷题系统</h2>
-        <a href="#" class="btn" onclick="showLogin()">学生登录</a>
-        <a href="#" class="btn" onclick="showRegister()">学生注册</a>
-        <a href="#" class="btn" onclick="showAdmin()">教师后台</a>
-    </div>
+    <div class="container" id="app"></div>
 
     <script>
-        let users = JSON.parse(localStorage.getItem('users')) || [];
-        let papers = JSON.parse(localStorage.getItem('papers')) || [];
-        let questions = JSON.parse(localStorage.getItem('questions')) || [];
-        let currentUser = null;
-        const ADMIN_PASS = "123456";
+        // ==============================================
+        // 配置区（自己可改）
+        // ==============================================
+        const FREE_INVITE_CODE = "YZW2026"; // 永久免费邀请码
+        const ADMIN_PASS = "awedsr134793";        // 教师后台密码
+        const WECHAT_ID = "475589411";     // 你的微信号，用于用户付款后联系
 
-        function renderHome(){document.getElementById('app').innerHTML=`<h2>数学提分刷题系统</h2><a href="#" class="btn" onclick="showLogin()">学生登录</a><a href="#" class="btn" onclick="showRegister()">学生注册</a><a href="#" class="btn" onclick="showAdmin()">教师后台</a>`}
-        function showLogin(){document.getElementById('app').innerHTML=`<h3>学生登录</h3><input id="loginUser" placeholder="账号"><input type="password" id="loginPwd" placeholder="密码"><button onclick="login()">登录</button><br><a href="#" onclick="renderHome()">返回</a>`}
-        function login(){let u=document.getElementById('loginUser').value,p=document.getElementById('loginPwd').value;if(users.find(x=>x.username===u&&x.password===p)){currentUser=u;renderPapers()}else alert('账号密码错误')}
-        function showRegister(){document.getElementById('app').innerHTML=`<h3>学生注册</h3><input id="regUser" placeholder="账号"><input type="password" id="regPwd" placeholder="密码"><input id="regName" placeholder="姓名"><input id="regGrade" placeholder="年级"><button onclick="register()">注册</button><br><a href="#" onclick="renderHome()">返回</a>`}
-        function register(){let u=document.getElementById('regUser').value,p=document.getElementById('regPwd').value,n=document.getElementById('regName').value,g=document.getElementById('regGrade').value;if(users.find(x=>x.username===u))return alert('账号已存在');users.push({username:u,password:p,name:n,grade:g});localStorage.users=JSON.stringify(users);alert('注册成功');showLogin()}
-        function showAdmin(){document.getElementById('app').innerHTML=`<h3>教师登录</h3><input type="password" id="adminPwd" placeholder="管理员密码"><button onclick="adminLogin()">登录</button><br><a href="#" onclick="renderHome()">返回</a>`}
-        function adminLogin(){let p=document.getElementById('adminPwd').value;if(p===ADMIN_PASS)renderAdmin();else alert('密码错误')}
-        function renderAdmin(){document.getElementById('app').innerHTML=`<h3>教师管理后台</h3><a href="#" class="btn" onclick="createPaper()">创建试卷</a><a href="#" class="btn" onclick="renderPaperList()">管理试卷</a><a href="#" class="btn" onclick="renderHome()">返回首页</a>`}
-        function createPaper(){let t=prompt('输入试卷名称');if(!t)return;papers.push({id:Date.now(),title:t});localStorage.papers=JSON.stringify(papers);renderPaperList()}
-        function renderPaperList(){let h=`<h3>试卷列表</h3>`;papers.forEach(p=>{h+=`<div class="item"><b>${p.title}</b><br><a href="#" onclick="addQuestion(${p.id})">添加题目</a><a href="#" onclick="delPaper(${p.id})" style="color:red;margin-left:10px;">删除</a></div>`});h+=`<br><a href="#" onclick="renderAdmin()">返回</a>`;document.getElementById('app').innerHTML=h}
-        function addQuestion(pid){let c=prompt('题目（用___做填空）'),a=prompt('标准答案');if(!c||!a)return;questions.push({id:Date.now(),paper_id:pid,content:c,answer:a});localStorage.questions=JSON.stringify(questions);alert('添加成功');renderPaperList()}
-        function delPaper(pid){if(!confirm('确定删除？'))return;papers=papers.filter(p=>p.id!==pid);questions=questions.filter(q=>q.paper_id!==pid);localStorage.papers=JSON.stringify(papers);localStorage.questions=JSON.stringify(questions);renderPaperList()}
-        function renderPapers(){let h=`<h3>我的试卷</h3>`;papers.forEach(p=>{h+=`<div class="item"><b>${p.title}</b><br><a href="#" class="btn" onclick="doPaper(${p.id})">开始答题</a></div>`});h+=`<br><a href="#" onclick="currentUser=null;renderHome()">退出登录</a>`;document.getElementById('app').innerHTML=h}
-        function doPaper(pid){let qs=questions.filter(q=>q.paper_id===pid);if(qs.length===0)return alert('暂无题目');let h=`<h3>开始答题</h3>`;qs.forEach((q,i)=>{h+=`<div class="item"><p>${q.content}</p><input id="ans${i}" placeholder="输入答案" style="width:100%;"></div>`});h+=`<button onclick="submitPaper(${pid})">提交批改</button>`;document.getElementById('app').innerHTML=h}
-        function submitPaper(pid){let qs=questions.filter(q=>q.paper_id===pid),right=0;qs.forEach((q,i)=>{let a=document.getElementById(`ans${i}`).value.trim();if(a===q.answer.trim())right++});let s=Math.round(right/qs.length*100);alert(`得分：${s}分\n答对：${right}题\n答错：${qs.length-right}题`);renderPapers()}
+        // 本地存储
+        let users = JSON.parse(localStorage.getItem("users")) || [];
+        let papers = JSON.parse(localStorage.getItem("papers")) || [];
+        let questions = JSON.parse(localStorage.getItem("questions")) || [];
+        let currentUser = null;
+
+        // ==============================================
+        // 页面路由
+        // ==============================================
+        function renderHome(){
+            document.getElementById("app").innerHTML = `
+            <div class="card">
+                <div class="title">全科智能刷题系统</div>
+                <button onclick="renderLogin()">学生登录</button>
+                <button class="btn-outline mt10" onclick="renderRegister()">学生注册</button>
+                <button class="btn-outline mt10" onclick="renderAdminLogin()">教师后台</button>
+                <div class="text-center tip mt10">无邀请码需付费开通会员</div>
+            </div>`;
+        }
+
+        // ==============================================
+        // 注册（已修复：非空校验 + 邀请码判断）
+        // ==============================================
+        function renderRegister(){
+            document.getElementById("app").innerHTML = `
+            <div class="card">
+                <div class="title">注册</div>
+                <input id="username" placeholder="请输入账号（必填）">
+                <input id="pwd" placeholder="请输入密码（必填）" type="password">
+                <input id="name" placeholder="请输入姓名（必填）">
+                <input id="grade" placeholder="请输入年级（必填）">
+                <input id="inviteCode" placeholder="邀请码（必填，无请付费）">
+                <button onclick="doRegister()">立即注册</button>
+                <div class="text-center mt10">
+                    <span onclick="renderHome()" style="color:#2c52ed;cursor:pointer">返回首页</span>
+                </div>
+                <div class="text-center mt10">
+                    <span onclick="renderPay()" style="color:red;cursor:pointer">没有邀请码？立即付费开通</span>
+                </div>
+            </div>`;
+        }
+
+        function doRegister(){
+            let u = document.getElementById("username").value.trim();
+            let p = document.getElementById("pwd").value.trim();
+            let n = document.getElementById("name").value.trim();
+            let g = document.getElementById("grade").value.trim();
+            let code = document.getElementById("inviteCode").value.trim();
+
+            // 非空校验（修复BUG）
+            if(!u || !p || !n || !g || !code){
+                alert("请填写完整信息！所有项均为必填！");
+                return;
+            }
+
+            if(users.find(x=>x.username === u)){
+                alert("账号已存在！");
+                return;
+            }
+
+            // 邀请码判断（这里你可以后续扩展多个付费码）
+            let validCodes = [FREE_INVITE_CODE, "TIYAN2026", "YUE2026", "NIAN2026"];
+            if(!validCodes.includes(code)){
+                alert("邀请码无效！\n请点击【没有邀请码？立即付费开通】获取有效邀请码");
+                return;
+            }
+
+            users.push({
+                username:u, password:p, name:n, grade:g, invite:code
+            });
+            localStorage.setItem("users", JSON.stringify(users));
+            alert("注册成功！请登录");
+            renderLogin();
+        }
+
+        // ==============================================
+        // 登录
+        // ==============================================
+        function renderLogin(){
+            document.getElementById("app").innerHTML = `
+            <div class="card">
+                <div class="title">登录</div>
+                <input id="username" placeholder="账号">
+                <input id="pwd" type="password" placeholder="密码">
+                <button onclick="doLogin()">登录</button>
+                <div class="text-center mt10">
+                    <span onclick="renderRegister()" style="color:#2c52ed;cursor:pointer">没有账号？去注册</span>
+                </div>
+                <div class="text-center mt10">
+                    <span onclick="renderPay()" style="color:red;cursor:pointer">无邀请码？开通会员</span>
+                </div>
+            </div>`;
+        }
+
+        function doLogin(){
+            let u = document.getElementById("username").value.trim();
+            let p = document.getElementById("pwd").value.trim();
+            let user = users.find(x=>x.username === u && x.password === p);
+            if(!user){
+                alert("账号或密码错误");
+                return;
+            }
+            currentUser = user;
+            renderPaperList();
+        }
+
+        // ==============================================
+        // 付费页面（核心新增：套餐+收款码+联系微信）
+        // ==============================================
+        function renderPay(){
+            document.getElementById("app").innerHTML = `
+            <div class="card">
+                <div class="title">开通会员 · 获取邀请码</div>
+                <div style="line-height:1.8; font-size:15px;">
+                    ✅ 体验会员：<strong>9.9元 / 30天</strong><br>
+                    ✅ 月度会员：<strong>25元 / 月</strong><br>
+                    ✅ 年度会员：<strong>99元 / 年</strong><br><br>
+                    <span class="red">⚠️ 付款备注：姓名+套餐（例：张三+年卡）</span>
+                </div>
+
+                <div class="text-center">
+                    <div style="font-weight:bold;margin:8px 0;">微信扫码付款</div>
+                    <img src="wx.png" class="pay-qrcode" alt="微信收款码">
+                </div>
+
+                <div class="text-center">
+                    <div style="font-weight:bold;margin:8px 0;">支付宝扫码付款</div>
+                    <img src="zfb.png" class="pay-qrcode" alt="支付宝收款码">
+                </div>
+
+                <div style="font-size:12px;color:#666;text-align:center;margin-top:15px">
+                    付款后请加微信：<strong>${WECHAT_ID}</strong> 领取专属邀请码
+                </div>
+
+                <button class="mt10" onclick="renderHome()">返回首页</button>
+            </div>`;
+        }
+
+        // ==============================================
+        // 学生 - 试卷列表
+        // ==============================================
+        function renderPaperList(){
+            let html = `<div class="card"><div class="title">我的试卷</div>`;
+            if(papers.length === 0){
+                html += `<div class="text-center">暂无试卷</div>`;
+            }
+            papers.forEach(p=>{
+                html += `<button class="mt10" onclick="doPaper(${p.id})">${p.title}</button>`;
+            });
+            html += `<button class="btn-outline mt10" onclick="logout()">退出登录</button></div>`;
+            document.getElementById("app").innerHTML = html;
+        }
+
+        // ==============================================
+        // 做题
+        // ==============================================
+        function doPaper(pid){
+            let qs = questions.filter(q=>q.paper_id === pid);
+            if(qs.length === 0){
+                alert("暂无题目");
+                return;
+            }
+            let html = `<div class="card"><div class="title">开始答题</div>`;
+            qs.forEach((q,i)=>{
+                html += `<div style="margin-bottom:15px">
+                <div>${q.content}</div>
+                <input id="ans${i}" placeholder="请输入答案">
+                </div>`;
+            });
+            html += `<button onclick="submitPaper(${pid})">提交批改</button></div>`;
+            document.getElementById("app").innerHTML = html;
+        }
+
+        function submitPaper(pid){
+            let qs = questions.filter(q=>q.paper_id === pid);
+            let right = 0;
+            qs.forEach((q,i)=>{
+                let val = document.getElementById(`ans${i}`).value.trim();
+                if(val === q.answer.trim()) right++;
+            });
+            let score = Math.round(right / qs.length * 100);
+            alert(`完成！\n得分：${score}分\n正确：${right} 题\n错误：${qs.length-right} 题`);
+            renderPaperList();
+        }
+
+        function logout(){
+            currentUser = null;
+            renderHome();
+        }
+
+        // ==============================================
+        // 教师登录
+        // ==============================================
+        function renderAdminLogin(){
+            document.getElementById("app").innerHTML = `
+            <div class="card">
+                <div class="title">教师登录</div>
+                <input id="pwd" type="password" placeholder="密码">
+                <button onclick="checkAdmin()">登录</button>
+                <div class="text-center mt10">
+                    <span onclick="renderHome()" style="color:#2c52ed;cursor:pointer">返回</span>
+                </div>
+            </div>`;
+        }
+
+        function checkAdmin(){
+            let p = document.getElementById("pwd").value.trim();
+            if(p === ADMIN_PASS){
+                renderAdmin();
+            }else{
+                alert("密码错误");
+            }
+        }
+
+        function renderAdmin(){
+            document.getElementById("app").innerHTML = `
+            <div class="card">
+                <div class="title">管理后台</div>
+                <button onclick="createPaper()">新建试卷</button>
+                <button class="mt10" onclick="showPaperList()">管理题目</button>
+                <button class="mt10 btn-outline" onclick="renderHome()">退出</button>
+            </div>`;
+        }
+
+        function createPaper(){
+            let t = prompt("输入试卷名称");
+            if(!t) return;
+            papers.push({id:Date.now(), title:t});
+            localStorage.setItem("papers", JSON.stringify(papers));
+            showPaperList();
+        }
+
+        function showPaperList(){
+            let html = `<div class="card"><div class="title">试卷列表</div>`;
+            papers.forEach(p=>{
+                html += `<div style="padding:10px;border-bottom:1px solid #eee">
+                <div>${p.title}</div>
+                <button style="padding:8px;margin-top:5px" onclick="addQuestion(${p.id})">添加题目</button>
+                </div>`;
+            });
+            html += `<button class="mt10 btn-outline" onclick="renderAdmin()">返回</button></div>`;
+            document.getElementById("app").innerHTML = html;
+        }
+
+        function addQuestion(pid){
+            let c = prompt("题目内容（可用___表示填空）");
+            let a = prompt("标准答案");
+            if(!c || !a) return;
+            questions.push({
+                id:Date.now(), paper_id:pid, content:c, answer:a
+            });
+            localStorage.setItem("questions", JSON.stringify(questions));
+            alert("添加成功");
+            showPaperList();
+        }
+
+        // 启动
         renderHome();
     </script>
 </body>
