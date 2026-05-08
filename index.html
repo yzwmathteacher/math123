@@ -3,7 +3,10 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>全科智能刷题系统 | 官方平台</title>
+    <title>大湾区全科智能刷题系统 | 官方平台</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <style>
         *{box-sizing:border-box}
         body{background:#f5f7fa;margin:0;padding:15px;font-family:Arial,"微软雅黑"}
@@ -37,15 +40,12 @@
     <script>
         // 配置
         const ADMIN_PASS = "awedsr134793";
-        const WECHAT_ID = "475589411";
-        const SYS_NOTICE = "欢迎使用全科智能刷题系统！\n付费请联系管理员微信。";
+        const WECHAT_ID = "475589411"; // 你的微信号
+        const SYS_NOTICE = "欢迎使用大湾区全科智能刷题系统！\n付费请联系管理员微信，切勿私下转账。";
 
-        // 邀请码套餐
+        // 邀请码套餐（后台生成，前台不显示）
         const CODE_CONFIG = {
-            "YZW2026":{type:"内部永久会员",days:99999},
-            "TIYAN2026":{type:"30天体验会员",days:30},
-            "YUE2026":{type:"月度会员",days:30},
-            "NIAN2026":{type:"年度会员",days:365}
+            "YZW2026":{type:"内部永久会员",days:99999}
         };
 
         // 学科
@@ -132,7 +132,7 @@
             let c = document.getElementById("regCode").value.trim();
             if(!u||!p||!n||!g||!c) return alert("所有栏目不能为空！");
             if(users.find(x=>x.username===u)) return alert("账号已存在");
-            if(!CODE_CONFIG[c]) return alert("邀请码无效");
+            if(!CODE_CONFIG[c]) return alert("邀请码无效，请先付费获取");
 
             let now = getNowDay();
             users.push({
@@ -309,17 +309,41 @@
             renderWrongBook();
         }
 
-        // 付费页面
+        // 【修复版】付费页面：只显示套餐+收款码，不显示邀请码
         function renderPay(){
             document.getElementById("app").innerHTML = `
                 <div class="card">
                     <div class="title">会员付费开通</div>
-                    <div style="line-height:2">
-                        ✅ 30天体验 9.9元  邀请码：TIYAN2026<br>
-                        ✅ 月度会员 25元    邀请码：YUE2026<br>
-                        ✅ 年度会员 99元    邀请码：NIAN2026
+                    <div style="line-height:2; text-align:left; padding:0 10px;">
+                        <div style="display:flex;align-items:center;margin:10px 0;">
+                            <span class="green" style="font-size:20px; margin-right:8px;">✅</span>
+                            <span>30天体验会员 —— 9.9元</span>
+                        </div>
+                        <div style="display:flex;align-items:center;margin:10px 0;">
+                            <span class="green" style="font-size:20px; margin-right:8px;">✅</span>
+                            <span>月度会员 —— 25元</span>
+                        </div>
+                        <div style="display:flex;align-items:center;margin:10px 0;">
+                            <span class="green" style="font-size:20px; margin-right:8px;">✅</span>
+                            <span>年度会员 —— 99元</span>
+                        </div>
+                        <div style="display:flex;align-items:center;margin:10px 0;">
+                            <span class="green" style="font-size:20px; margin-right:8px;">✅</span>
+                            <span>永久会员 —— 199元</span>
+                        </div>
                     </div>
-                    <div class="text-center tip">付款后联系微信：${WECHAT_ID} 领取邀请码</div>
+                    <div class="text-center" style="margin-top:20px;">
+                        <div style="font-weight:bold; margin-bottom:8px;">微信扫码付款（备注：姓名+套餐）</div>
+                        <img src="wx.png" class="pay-qrcode" alt="微信收款码">
+                    </div>
+                    <div class="text-center" style="margin-top:15px;">
+                        <div style="font-weight:bold; margin-bottom:8px;">支付宝扫码付款（备注：姓名+套餐）</div>
+                        <img src="zfb.png" class="pay-qrcode" alt="支付宝收款码">
+                    </div>
+                    <div style="font-size:12px;color:#666;text-align:center;margin-top:15px;line-height:1.6;">
+                        付款后请添加微信：<strong>${WECHAT_ID}</strong><br>
+                        发送付款截图+姓名+年级，审核通过后发放专属邀请码
+                    </div>
                     <button class="mt10" onclick="renderHome()">返回首页</button>
                 </div>
             `;
@@ -494,14 +518,14 @@
             adminUserList();
         }
 
-        // 生成自定义邀请码
+        // 生成自定义邀请码（后台专用）
         function adminCreateInvite(){
             let code = "INV"+Date.now().toString().slice(-6);
-            let day = prompt("请输入有效天数：");
+            let day = prompt("请输入有效天数：\n30=月会员，365=年会员，99999=永久");
             let d = parseInt(day);
             if(isNaN(d)||d<=0) return alert("天数错误");
             CODE_CONFIG[code] = {type:"自定义会员",days:d};
-            alert("生成成功！\n邀请码："+code+"\n有效期："+d+"天");
+            alert("生成成功！\n邀请码："+code+"\n有效期："+d+"天\n请复制发给用户");
             renderAdminMain();
         }
 
