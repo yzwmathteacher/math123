@@ -106,8 +106,8 @@
         function renderHome(){
             document.getElementById("app").innerHTML = `
             <div class="card">
-                <div class="title">全科智能刷题系统</div>
-                <div class="sub-title">专注中小学全科在线刷题平台</div>
+                <div class="title">大湾区全科智能刷题系统</div>
+                <div class="sub-title">专注大湾区中小学全科在线刷题平台</div>
                 <button onclick="renderLogin()">学生登录</button>
                 <button class="btn-outline mt10" onclick="renderRegister()">学生注册</button>
                 <button class="btn-outline mt10" onclick="renderAdminLogin()">教师后台</button>
@@ -206,8 +206,8 @@
             }
 
             let nowDay = getNowDay();
-            let usedDay = nowDay - user.regDay;
-            if(usedDay > user.validDays){
+            let used = nowDay - user.regDay;
+            if(used > user.validDays){
                 alert("会员已过期！\n请重新付费获取邀请码续期");
                 return;
             }
@@ -445,33 +445,89 @@
             }
             papers.push({id:Date.now(), title:t, subject:subKey});
             saveData();
+            alert("试卷创建成功！");
             showPaperList();
         }
 
-        // 管理试卷题目
+        // 【修复版】管理试卷列表 + 可进入题目管理
         function showPaperList(){
-            let html = `<div class="card"><div class="title">试卷列表</div>`;
-            papers.forEach(p=>{
-                let subInfo = SUBJECT_LIST.find(x=>x.key===p.subject);
-                html += `<div style="padding:10px;border-bottom:1px solid #eee">
-                <div>${p.title} <span class="tag ${subInfo.cls}">${subInfo.name}</span></div>
-                <button style="padding:6px;margin-top:5px" onclick="addQuestion(${p.id})">添加题目</button>
-                </div>`;
-            });
+            let html = `<div class="card"><div class="title">试卷列表（点击添加题目）</div>`;
+            if(papers.length === 0){
+                html += `<div class="text-center">暂无试卷，请先新建试卷</div>`;
+            }else{
+                papers.forEach(p=>{
+                    let subInfo = SUBJECT_LIST.find(x=>x.key===p.subject);
+                    let qCount = questions.filter(q=>q.paper_id===p.id).length;
+                    html += `
+                    <div style="padding:10px;border-bottom:1px solid #eee">
+                        <div>${p.title} <span class="tag ${subInfo.cls}">${subInfo.name}</span> （${qCount}题）</div>
+                        <button style="padding:6px;margin-top:5px" onclick="manageQuestions(${p.id})">管理题目</button>
+                    </div>`;
+                });
+            }
             html += `<button class="mt10 btn-outline" onclick="renderAdmin()">返回</button></div>`;
             document.getElementById("app").innerHTML = html;
         }
 
-        // 添加题目
+        // 【修复版】管理单套试卷的题目（增/删）
+        function manageQuestions(pid){
+            let paper = papers.find(p=>p.id===pid);
+            let qs = questions.filter(q=>q.paper_id===pid);
+            let html = `<div class="card"><div class="title">${paper.title} - 题目管理</div>`;
+
+            // 题目列表
+            if(qs.length===0){
+                html += `<div class="text-center">暂无题目，请添加</div>`;
+            }else{
+                qs.forEach((q,idx)=>{
+                    html += `
+                    <div style="padding:10px;border-bottom:1px solid #eee">
+                        <div><strong>题${idx+1}：</strong>${q.content}</div>
+                        <div class="tip">答案：${q.answer}</div>
+                        <button style="padding:6px;font-size:12px;margin-top:5px" onclick="delQuestion(${q.id})">删除</button>
+                    </div>`;
+                });
+            }
+
+            // 添加题目按钮
+            html += `
+            <button class="mt10" onclick="addQuestion(${pid})">添加新题目</button>
+            <button class="mt10 btn-outline" onclick="showPaperList()">返回试卷列表</button></div>`;
+            document.getElementById("app").innerHTML = html;
+        }
+
+        // 【修复版】添加题目（存入对应试卷）
         function addQuestion(pid){
             let c = prompt("题目内容（填空用___）");
             let a = prompt("标准答案");
-            if(!c || !a) return;
-            let p = papers.find(x=>x.id===pid);
-            questions.push({id:Date.now(), paper_id:pid, subject:p.subject, content:c, answer:a});
+            if(!c || !a){
+                alert("题目和答案不能为空");
+                return;
+            }
+            let paper = papers.find(p=>p.id===pid);
+            questions.push({
+                id:Date.now(),
+                paper_id:pid,
+                subject:paper.subject,
+                content:c.trim(),
+                answer:a.trim()
+            });
             saveData();
-            alert("题目添加成功");
-            showPaperList();
+            alert("题目添加成功！");
+            manageQuestions(pid); // 刷新当前试卷题目管理页
+        }
+
+        // 删除题目
+        function delQuestion(qid){
+            if(!confirm("确定删除该题目？")) return;
+            questions = questions.filter(q=>q.id!==qid);
+            saveData();
+            alert("已删除");
+            // 刷新页面（从当前URL拿pid）
+            let url = document.URL;
+            let pid = url.match(/manageQuestions\((\d+)\)/) ? RegExp.$1 : null;
+            if(pid) manageQuestions(Number(pid));
+            else showPaperList();
         }
 
         // 查看用户 + 续期 + 重置密码 + 禁用账号
