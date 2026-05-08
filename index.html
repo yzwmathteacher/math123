@@ -3,25 +3,30 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>全科智能刷题系统</title>
+    <title>大湾区全科智能刷题系统</title>
     <style>
         *{box-sizing:border-box}
         body{background:#f5f7fa;margin:0;padding:15px;font-family:Arial,"微软雅黑"}
         .container{max-width:500px;margin:0 auto}
         .card{background:white;border-radius:16px;padding:25px;margin:15px 0;box-shadow:0 2px 10px #00000010}
         .title{text-align:center;font-size:22px;font-weight:bold;margin-bottom:20px;color:#2c52ed}
-        input{width:100%;padding:12px;margin:8px 0;border:1px solid #ddd;border-radius:8px;font-size:15px}
+        input,select{width:100%;padding:12px;margin:8px 0;border:1px solid #ddd;border-radius:8px;font-size:15px}
         button{width:100%;padding:13px;background:#2c52ed;color:white;border:none;border-radius:8px;font-size:16px;margin-top:5px}
         .btn-outline{background:white;color:#2c52ed;border:1px solid #2c52ed}
         .text-center{text-align:center}
         .mt10{margin-top:10px}
         .red{color:red}
         .green{color:green}
+        .blue{color:#2c52ed}
         .tip{font-size:12px;color:#666;margin-top:5px}
         .pay-qrcode{width:200px;border-radius:8px;margin:10px auto;display:block}
-        table{width:100%;border-collapse:collapse;font-size:12px}
+        table{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0}
         th,td{border:1px solid #eee;padding:6px;text-align:center}
         th{background:#f5f7fa}
+        .tag{display:inline-block;padding:3px 8px;border-radius:4px;font-size:12px;color:#fff;margin:2px}
+        .tag-sx{background:#2c52ed}
+        .tag-yw{background:#4CAF50}
+        .tag-yy{background:#ff9800}
     </style>
 </head>
 <body>
@@ -40,15 +45,31 @@
             "NIAN2026":  { type:"年度会员", days: 365 }
         };
 
+        // 学科列表
+        const SUBJECT_LIST = [
+            {key:"math", name:"数学", cls:"tag-sx"},
+            {key:"chinese", name:"语文", cls:"tag-yw"},
+            {key:"english", name:"英语", cls:"tag-yy"}
+        ];
+
         // 本地存储数据
         let users = JSON.parse(localStorage.getItem("users")) || [];
         let papers = JSON.parse(localStorage.getItem("papers")) || [];
         let questions = JSON.parse(localStorage.getItem("questions")) || [];
+        let wrongBooks = JSON.parse(localStorage.getItem("wrongBooks")) || [];
         let currentUser = null;
 
         // 获取当前时间天数
         function getNowDay(){
             return Math.floor(Date.now() / (1000*60*60*24));
+        }
+
+        // 保存本地数据
+        function saveData(){
+            localStorage.setItem("users",JSON.stringify(users));
+            localStorage.setItem("papers",JSON.stringify(papers));
+            localStorage.setItem("questions",JSON.stringify(questions));
+            localStorage.setItem("wrongBooks",JSON.stringify(wrongBooks));
         }
 
         // ==================== 首页 ====================
@@ -90,7 +111,6 @@
             let g = document.getElementById("grade").value.trim();
             let code = document.getElementById("inviteCode").value.trim();
 
-            // 禁止空注册
             if(!u || !p || !n || !g || !code){
                 alert("所有栏目必须填写，不能为空！");
                 return;
@@ -99,7 +119,6 @@
                 alert("账号已存在，请换账号");
                 return;
             }
-            // 邀请码是否合法
             if(!CODE_CONFIG[code]){
                 alert("邀请码无效！\n请先付费获取正规邀请码");
                 return;
@@ -108,7 +127,6 @@
             let nowDay = getNowDay();
             let validDays = CODE_CONFIG[code].days;
 
-            // 写入用户数据
             users.push({
                 username:u,
                 password:p,
@@ -118,8 +136,7 @@
                 regDay: nowDay,
                 validDays: validDays
             });
-            localStorage.setItem("users", JSON.stringify(users));
-
+            saveData();
             alert(`注册成功！\n套餐类型：${CODE_CONFIG[code].type}\n有效时长：${validDays}天`);
             renderLogin();
         }
@@ -150,7 +167,6 @@
                 return;
             }
 
-            // 计算是否过期
             let nowDay = getNowDay();
             let usedDay = nowDay - user.regDay;
             if(usedDay > user.validDays){
@@ -159,7 +175,159 @@
             }
 
             currentUser = user;
-            renderPaperList();
+            renderStudentIndex();
+        }
+
+        // ==================== 学生主页（学科选择 + 错题本入口） ====================
+        function renderStudentIndex(){
+            let nowDay = getNowDay();
+            let used = nowDay - currentUser.regDay;
+            let left = currentUser.validDays - used;
+
+            let subHtml = "";
+            SUBJECT_LIST.forEach(s=>{
+                subHtml += `<button class="mt10" onclick="renderPaperBySubject('${s.key}')">${s.name}刷题</button>`;
+            });
+
+            document.getElementById("app").innerHTML = `
+            <div class="card">
+                <div class="title">欢迎 ${currentUser.name}</div>
+                <div class="text-center" style="line-height:1.8">
+                    年级：${currentUser.grade}<br>
+                    剩余会员时长：<span class="red">${left>0?left:0}</span> 天
+                </div>
+                ${subHtml}
+                <button class="mt10 btn-outline" onclick="renderWrongBook()">我的错题本</button>
+                <button class="mt10 btn-outline" onclick="logout()">退出登录</button>
+            </div>`;
+        }
+
+        // 按学科筛选试卷
+        function renderPaperBySubject(subKey){
+            let subInfo = SUBJECT_LIST.find(x=>x.key===subKey);
+            let html = `<div class="card"><div class="title">${subInfo.name} 试卷列表</div>`;
+            let list = papers.filter(p=>p.subject===subKey);
+            if(list.length === 0){
+                html += `<div class="text-center">暂无${subInfo.name}试卷</div>`;
+            }
+            list.forEach(p=>{
+                html += `<button class="mt10" onclick="doPaper(${p.id})">${p.title}</button>`;
+            });
+            html += `<button class="mt10 btn-outline" onclick="renderStudentIndex()">返回</button></div>`;
+            document.getElementById("app").innerHTML = html;
+        }
+
+        // ==================== 完整版错题本 ====================
+        function renderWrongBook(){
+            let myWrong = wrongBooks.filter(w=>w.username===currentUser.username);
+            if(myWrong.length === 0){
+                document.getElementById("app").innerHTML = `
+                <div class="card">
+                    <div class="title">我的错题本</div>
+                    <div class="text-center">暂无错题</div>
+                    <button class="mt10" onclick="renderStudentIndex()">返回</button>
+                </div>`;
+                return;
+            }
+
+            let html = `<div class="card"><div class="title">我的错题本</div>`;
+            myWrong.forEach((item,idx)=>{
+                let q = questions.find(x=>x.id===item.questionId);
+                let subInfo = SUBJECT_LIST.find(x=>x.key===q.subject);
+                html += `
+                <div style="padding:10px;border-bottom:1px solid #eee">
+                    <span class="tag ${subInfo.cls}">${subInfo.name}</span>
+                    <div style="margin:5px 0;">${q.content}</div>
+                    <div class="tip">正确答案：${q.answer}</div>
+                    <button style="padding:6px;margin-top:5px" onclick="redoWrong(${item.questionId})">重做此题</button>
+                </div>`;
+            });
+            html += `
+            <button class="mt10 btn-outline" onclick="clearAllWrong()">清空全部错题</button>
+            <button class="mt10 btn-outline" onclick="renderStudentIndex()">返回</button></div>`;
+            document.getElementById("app").innerHTML = html;
+        }
+
+        // 重做错题
+        function redoWrong(qid){
+            let q = questions.find(x=>x.id===qid);
+            document.getElementById("app").innerHTML = `
+            <div class="card">
+                <div class="title">重做错题</div>
+                <div style="margin-bottom:15px">${q.content}</div>
+                <input id="ansRedo" placeholder="请输入答案">
+                <button onclick="checkRedo(${qid})">提交核对</button>
+            </div>`;
+        }
+
+        function checkRedo(qid){
+            let q = questions.find(x=>x.id===qid);
+            let val = document.getElementById("ansRedo").value.trim();
+            if(val === q.answer.trim()){
+                alert("回答正确！已移出错题记录");
+                wrongBooks = wrongBooks.filter(w=>!(w.username===currentUser.username && w.questionId===qid));
+                saveData();
+            }else{
+                alert("答案错误，请再思考一下");
+            }
+            renderWrongBook();
+        }
+
+        // 清空错题
+        function clearAllWrong(){
+            if(!confirm("确定要清空所有错题吗？不可恢复！")) return;
+            wrongBooks = wrongBooks.filter(w=>w.username!==currentUser.username);
+            saveData();
+            alert("已清空");
+            renderWrongBook();
+        }
+
+        // ==================== 做题批改 + 自动收录错题 ====================
+        function doPaper(pid){
+            let qs = questions.filter(q=>q.paper_id === pid);
+            if(qs.length === 0){
+                alert("该试卷暂无题目");
+                return;
+            }
+            let html = `<div class="card"><div class="title">开始答题</div>`;
+            qs.forEach((q,i)=>{
+                html += `<div style="margin-bottom:15px">
+                <div>${q.content}</div>
+                <input id="ans${i}" placeholder="输入答案">
+                </div>`;
+            });
+            html += `<button onclick="submitPaper(${pid})">提交批改</button></div>`;
+            document.getElementById("app").innerHTML = html;
+        }
+
+        function submitPaper(pid){
+            let qs = questions.filter(q=>q.paper_id === pid);
+            let right = 0;
+            qs.forEach((q,i)=>{
+                let val = document.getElementById(`ans${i}`).value.trim();
+                if(val === q.answer.trim()){
+                    right++;
+                }else{
+                    // 自动加入错题本
+                    let has = wrongBooks.find(w=>w.username===currentUser.username && w.questionId===q.id);
+                    if(!has){
+                        wrongBooks.push({
+                            username:currentUser.username,
+                            questionId:q.id,
+                            addTime:getNowDay()
+                        });
+                    }
+                }
+            });
+            saveData();
+            let score = Math.round(right / qs.length * 100);
+            alert(`测评完成\n得分：${score}分\n答对：${right}题\n答错：${qs.length-right}题\n错题已自动加入错题本`);
+            renderStudentIndex();
+        }
+
+        function logout(){
+            currentUser = null;
+            renderHome();
         }
 
         // ==================== 付费页面 ====================
@@ -191,54 +359,6 @@
             </div>`;
         }
 
-        // ==================== 学生试卷中心 ====================
-        function renderPaperList(){
-            let html = `<div class="card"><div class="title">我的刷题试卷</div>`;
-            if(papers.length === 0){
-                html += `<div class="text-center">暂无试卷，请老师添加</div>`;
-            }
-            papers.forEach(p=>{
-                html += `<button class="mt10" onclick="doPaper(${p.id})">${p.title}</button>`;
-            });
-            html += `<button class="btn-outline mt10" onclick="logout()">退出登录</button></div>`;
-            document.getElementById("app").innerHTML = html;
-        }
-
-        // 做题与自动批改
-        function doPaper(pid){
-            let qs = questions.filter(q=>q.paper_id === pid);
-            if(qs.length === 0){
-                alert("该试卷暂无题目");
-                return;
-            }
-            let html = `<div class="card"><div class="title">开始答题</div>`;
-            qs.forEach((q,i)=>{
-                html += `<div style="margin-bottom:15px">
-                <div>${q.content}</div>
-                <input id="ans${i}" placeholder="输入答案">
-                </div>`;
-            });
-            html += `<button onclick="submitPaper(${pid})">提交批改</button></div>`;
-            document.getElementById("app").innerHTML = html;
-        }
-
-        function submitPaper(pid){
-            let qs = questions.filter(q=>q.paper_id === pid);
-            let right = 0;
-            qs.forEach((q,i)=>{
-                let val = document.getElementById(`ans${i}`).value.trim();
-                if(val === q.answer.trim()) right++;
-            });
-            let score = Math.round(right / qs.length * 100);
-            alert(`测评完成\n得分：${score}分\n答对：${right}题\n答错：${qs.length-right}题`);
-            renderPaperList();
-        }
-
-        function logout(){
-            currentUser = null;
-            renderHome();
-        }
-
         // ==================== 教师后台 ====================
         function renderAdminLogin(){
             document.getElementById("app").innerHTML = `
@@ -267,17 +387,26 @@
                 <div class="title">教师管理中心</div>
                 <button onclick="createPaper()">新建试卷</button>
                 <button class="mt10" onclick="showPaperList()">管理题目</button>
-                <button class="mt10" onclick="showUserList()">查看所有注册用户</button>
+                <button class="mt10" onclick="showUserList()">用户列表/续期</button>
+                <button class="mt10" onclick="renderCreateInvite()">生成自定义邀请码</button>
                 <button class="mt10 btn-outline" onclick="renderHome()">退出</button>
             </div>`;
         }
 
-        // 新建试卷
+        // 新建试卷（带学科选择）
         function createPaper(){
             let t = prompt("请输入试卷名称");
             if(!t) return;
-            papers.push({id:Date.now(), title:t});
-            localStorage.setItem("papers", JSON.stringify(papers));
+            let subSel = "";
+            SUBJECT_LIST.forEach(s=>subSel += s.key+":"+s.name+" ");
+            let subKey = prompt("请输入学科编码：\nmath:数学 chinese:语文 english:英语");
+            let checkSub = SUBJECT_LIST.find(x=>x.key===subKey);
+            if(!checkSub){
+                alert("学科编码错误");
+                return;
+            }
+            papers.push({id:Date.now(), title:t, subject:subKey});
+            saveData();
             showPaperList();
         }
 
@@ -285,8 +414,9 @@
         function showPaperList(){
             let html = `<div class="card"><div class="title">试卷列表</div>`;
             papers.forEach(p=>{
+                let subInfo = SUBJECT_LIST.find(x=>x.key===p.subject);
                 html += `<div style="padding:10px;border-bottom:1px solid #eee">
-                <div>${p.title}</div>
+                <div>${p.title} <span class="tag ${subInfo.cls}">${subInfo.name}</span></div>
                 <button style="padding:6px;margin-top:5px" onclick="addQuestion(${p.id})">添加题目</button>
                 </div>`;
             });
@@ -299,13 +429,14 @@
             let c = prompt("题目内容（填空用___）");
             let a = prompt("标准答案");
             if(!c || !a) return;
-            questions.push({id:Date.now(), paper_id:pid, content:c, answer:a});
-            localStorage.setItem("questions", JSON.stringify(questions));
+            let p = papers.find(x=>x.id===pid);
+            questions.push({id:Date.now(), paper_id:pid, subject:p.subject, content:c, answer:a});
+            saveData();
             alert("题目添加成功");
             showPaperList();
         }
 
-        // 新增：查看所有用户 + 剩余有效期
+        // 查看用户 + 手动续期
         function showUserList(){
             if(users.length === 0){
                 document.getElementById("app").innerHTML = `
@@ -320,14 +451,14 @@
             let nowDay = getNowDay();
             let html = `
             <div class="card">
-                <div class="title">注册用户列表</div>
+                <div class="title">用户列表 & 续期</div>
                 <table>
                     <tr>
                         <th>姓名</th>
                         <th>年级</th>
                         <th>套餐</th>
                         <th>剩余天数</th>
-                        <th>状态</th>
+                        <th>操作</th>
                     </tr>`;
 
             users.forEach(u=>{
@@ -341,12 +472,41 @@
                     <td>${u.grade}</td>
                     <td>${typeName}</td>
                     <td>${left > 0 ? left : 0}天</td>
-                    <td>${status}</td>
+                    <td><button style="padding:4px" onclick="editUserDay('${u.username}')">续期</button></td>
                 </tr>`;
             });
 
             html += `</table><button class="mt10" onclick="renderAdmin()">返回</button></div>`;
             document.getElementById("app").innerHTML = html;
+        }
+
+        // 给用户续期
+        function editUserDay(uname){
+            let addDay = prompt("请输入要增加的天数：");
+            let num = parseInt(addDay);
+            if(isNaN(num) || num<=0){
+                alert("请输入正确数字");
+                return;
+            }
+            let user = users.find(x=>x.username===uname);
+            user.validDays += num;
+            saveData();
+            alert("续期成功！");
+            showUserList();
+        }
+
+        // 生成自定义邀请码
+        function renderCreateInvite(){
+            let code = "INV" + Date.now().toString().slice(-8);
+            let day = prompt("请输入该邀请码有效天数：");
+            let d = parseInt(day);
+            if(isNaN(d)||d<=0){
+                alert("天数错误");
+                return;
+            }
+            CODE_CONFIG[code] = {type:"自定义会员", days:d};
+            alert("生成成功！\n邀请码："+code+"\n有效期："+d+"天\n已自动生效，可发给用户注册");
+            renderAdmin();
         }
 
         // 初始化首页
