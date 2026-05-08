@@ -3,21 +3,23 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>大湾区全科智能刷题系统</title>
+    <title>全科智能刷题系统 | 官方平台</title>
     <style>
         *{box-sizing:border-box}
         body{background:#f5f7fa;margin:0;padding:15px;font-family:Arial,"微软雅黑"}
         .container{max-width:500px;margin:0 auto}
         .card{background:white;border-radius:16px;padding:25px;margin:15px 0;box-shadow:0 2px 10px #00000010}
         .title{text-align:center;font-size:22px;font-weight:bold;margin-bottom:20px;color:#2c52ed}
+        .sub-title{text-align:center;font-size:14px;color:#999;margin-bottom:15px}
         input,select{width:100%;padding:12px;margin:8px 0;border:1px solid #ddd;border-radius:8px;font-size:15px}
-        button{width:100%;padding:13px;background:#2c52ed;color:white;border:none;border-radius:8px;font-size:16px;margin-top:5px}
+        button{width:100%;padding:13px;background:#2c52ed;color:white;border:none;border-radius:8px;font-size:16px;margin-top:8px}
         .btn-outline{background:white;color:#2c52ed;border:1px solid #2c52ed}
         .text-center{text-align:center}
         .mt10{margin-top:10px}
         .red{color:red}
         .green{color:green}
         .blue{color:#2c52ed}
+        .gray{color:#999}
         .tip{font-size:12px;color:#666;margin-top:5px}
         .pay-qrcode{width:200px;border-radius:8px;margin:10px auto;display:block}
         table{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0}
@@ -27,6 +29,8 @@
         .tag-sx{background:#2c52ed}
         .tag-yw{background:#4CAF50}
         .tag-yy{background:#ff9800}
+        .popup{position:fixed;top:0;left:0;width:100%;height:100%;background:#00000077;display:flex;align-items:center;justify-content:center;padding:20px;z-index:999}
+        .popup-card{background:white;border-radius:16px;padding:20px;max-width:400px;width:100%}
     </style>
 </head>
 <body>
@@ -34,8 +38,10 @@
 
     <script>
         // ==================== 配置区（自行修改）====================
-        const ADMIN_PASS = "awedsr134793";
-        const WECHAT_ID = "475589411";
+        const ADMIN_PASS = "123456";
+        const WECHAT_ID = "换成你自己的微信号";
+        // 系统公告（可随时改）
+        const SYS_NOTICE = "欢迎使用全科智能刷题系统！\n付费请联系管理员微信，切勿私下转账。";
 
         // 邀请码对应套餐时效
         const CODE_CONFIG = {
@@ -64,6 +70,13 @@
             return Math.floor(Date.now() / (1000*60*60*24));
         }
 
+        // 天数转日期
+        function dayToDate(dayNum){
+            let timestamp = dayNum * 1000*60*60*24;
+            let d = new Date(timestamp);
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        }
+
         // 保存本地数据
         function saveData(){
             localStorage.setItem("users",JSON.stringify(users));
@@ -72,16 +85,36 @@
             localStorage.setItem("wrongBooks",JSON.stringify(wrongBooks));
         }
 
+        // 弹出系统公告
+        function showNotice(){
+            let html = `
+            <div class="popup" onclick="closeNotice(event)">
+                <div class="popup-card" onclick="event.stopPropagation()">
+                    <div class="title">系统公告</div>
+                    <div style="white-space:pre-line;text-align:center;line-height:1.8">${SYS_NOTICE}</div>
+                    <button class="mt10" onclick="closeNotice()">我已知晓</button>
+                </div>
+            </div>`;
+            document.body.insertAdjacentHTML("beforeend",html);
+        }
+        function closeNotice(event){
+            let pop = document.querySelector(".popup");
+            if(pop) pop.remove();
+        }
+
         // ==================== 首页 ====================
         function renderHome(){
             document.getElementById("app").innerHTML = `
             <div class="card">
                 <div class="title">全科智能刷题系统</div>
+                <div class="sub-title">专注中小学全科在线刷题平台</div>
                 <button onclick="renderLogin()">学生登录</button>
                 <button class="btn-outline mt10" onclick="renderRegister()">学生注册</button>
                 <button class="btn-outline mt10" onclick="renderAdminLogin()">教师后台</button>
                 <div class="text-center tip mt10">无官方邀请码请付费开通会员</div>
             </div>`;
+            // 进入首页自动弹公告
+            setTimeout(showNotice,300);
         }
 
         // ==================== 注册页面 + 非空校验 + 绑定有效期 ====================
@@ -134,14 +167,15 @@
                 grade:g,
                 inviteCode:code,
                 regDay: nowDay,
-                validDays: validDays
+                validDays: validDays,
+                disabled:false
             });
             saveData();
             alert(`注册成功！\n套餐类型：${CODE_CONFIG[code].type}\n有效时长：${validDays}天`);
             renderLogin();
         }
 
-        // ==================== 登录 + 自动过期判断 ====================
+        // ==================== 登录 + 自动过期判断 + 禁用判断 ====================
         function renderLogin(){
             document.getElementById("app").innerHTML = `
             <div class="card">
@@ -166,6 +200,10 @@
                 alert("账号或密码错误");
                 return;
             }
+            if(user.disabled){
+                alert("该账号已被管理员禁用，无法登录！");
+                return;
+            }
 
             let nowDay = getNowDay();
             let usedDay = nowDay - user.regDay;
@@ -178,15 +216,16 @@
             renderStudentIndex();
         }
 
-        // ==================== 学生主页（学科选择 + 错题本入口） ====================
+        // ==================== 学生主页（显示到期日期 + 学科 + 错题本） ====================
         function renderStudentIndex(){
             let nowDay = getNowDay();
             let used = nowDay - currentUser.regDay;
             let left = currentUser.validDays - used;
+            let endDate = dayToDate(currentUser.regDay + currentUser.validDays);
 
             let subHtml = "";
             SUBJECT_LIST.forEach(s=>{
-                subHtml += `<button class="mt10" onclick="renderPaperBySubject('${s.key}')">${s.name}刷题</button>`;
+                subHtml += `<button onclick="renderPaperBySubject('${s.key}')">${s.name}刷题</button>`;
             });
 
             document.getElementById("app").innerHTML = `
@@ -194,7 +233,8 @@
                 <div class="title">欢迎 ${currentUser.name}</div>
                 <div class="text-center" style="line-height:1.8">
                     年级：${currentUser.grade}<br>
-                    剩余会员时长：<span class="red">${left>0?left:0}</span> 天
+                    剩余会员时长：<span class="red">${left>0?left:0}</span> 天<br>
+                    会员到期日期：<span class="blue">${endDate}</span>
                 </div>
                 ${subHtml}
                 <button class="mt10 btn-outline" onclick="renderWrongBook()">我的错题本</button>
@@ -211,7 +251,7 @@
                 html += `<div class="text-center">暂无${subInfo.name}试卷</div>`;
             }
             list.forEach(p=>{
-                html += `<button class="mt10" onclick="doPaper(${p.id})">${p.title}</button>`;
+                html += `<button onclick="doPaper(${p.id})">${p.title}</button>`;
             });
             html += `<button class="mt10 btn-outline" onclick="renderStudentIndex()">返回</button></div>`;
             document.getElementById("app").innerHTML = html;
@@ -242,6 +282,7 @@
                     <button style="padding:6px;margin-top:5px" onclick="redoWrong(${item.questionId})">重做此题</button>
                 </div>`;
             });
+
             html += `
             <button class="mt10 btn-outline" onclick="clearAllWrong()">清空全部错题</button>
             <button class="mt10 btn-outline" onclick="renderStudentIndex()">返回</button></div>`;
@@ -308,7 +349,6 @@
                 if(val === q.answer.trim()){
                     right++;
                 }else{
-                    // 自动加入错题本
                     let has = wrongBooks.find(w=>w.username===currentUser.username && w.questionId===q.id);
                     if(!has){
                         wrongBooks.push({
@@ -387,7 +427,7 @@
                 <div class="title">教师管理中心</div>
                 <button onclick="createPaper()">新建试卷</button>
                 <button class="mt10" onclick="showPaperList()">管理题目</button>
-                <button class="mt10" onclick="showUserList()">用户列表/续期</button>
+                <button class="mt10" onclick="showUserList()">用户列表/续期/禁用</button>
                 <button class="mt10" onclick="renderCreateInvite()">生成自定义邀请码</button>
                 <button class="mt10 btn-outline" onclick="renderHome()">退出</button>
             </div>`;
@@ -397,9 +437,7 @@
         function createPaper(){
             let t = prompt("请输入试卷名称");
             if(!t) return;
-            let subSel = "";
-            SUBJECT_LIST.forEach(s=>subSel += s.key+":"+s.name+" ");
-            let subKey = prompt("请输入学科编码：\nmath:数学 chinese:语文 english:英语");
+            let subKey = prompt("请输入学科编码：\nmath=数学\nchinese=语文\nenglish=英语");
             let checkSub = SUBJECT_LIST.find(x=>x.key===subKey);
             if(!checkSub){
                 alert("学科编码错误");
@@ -436,7 +474,7 @@
             showPaperList();
         }
 
-        // 查看用户 + 手动续期
+        // 查看用户 + 续期 + 重置密码 + 禁用账号
         function showUserList(){
             if(users.length === 0){
                 document.getElementById("app").innerHTML = `
@@ -451,28 +489,32 @@
             let nowDay = getNowDay();
             let html = `
             <div class="card">
-                <div class="title">用户列表 & 续期</div>
+                <div class="title">用户管理</div>
                 <table>
                     <tr>
                         <th>姓名</th>
                         <th>年级</th>
-                        <th>套餐</th>
-                        <th>剩余天数</th>
+                        <th>到期日期</th>
+                        <th>状态</th>
                         <th>操作</th>
                     </tr>`;
 
             users.forEach(u=>{
                 let used = nowDay - u.regDay;
                 let left = u.validDays - used;
-                let status = left > 0 ? `<span class="green">正常</span>` : `<span class="red">已过期</span>`;
-                let typeName = CODE_CONFIG[u.inviteCode] ? CODE_CONFIG[u.inviteCode].type : "未知套餐";
+                let endDate = dayToDate(u.regDay + u.validDays);
+                let status = u.disabled ? `<span class="red">已禁用</span>` : (left>0 ? `<span class="green">正常</span>` : `<span class="red">已过期</span>`);
                 html += `
                 <tr>
                     <td>${u.name}</td>
                     <td>${u.grade}</td>
-                    <td>${typeName}</td>
-                    <td>${left > 0 ? left : 0}天</td>
-                    <td><button style="padding:4px" onclick="editUserDay('${u.username}')">续期</button></td>
+                    <td>${endDate}</td>
+                    <td>${status}</td>
+                    <td>
+                        <button style="padding:3px;font-size:10px" onclick="editUserDay('${u.username}')">续期</button>
+                        <button style="padding:3px;font-size:10px" onclick="resetPwd('${u.username}')">重置密码</button>
+                        <button style="padding:3px;font-size:10px" onclick="toggleDisable('${u.username}')">${u.disabled?'解禁':'禁用'}</button>
+                    </td>
                 </tr>`;
             });
 
@@ -495,6 +537,29 @@
             showUserList();
         }
 
+        // 重置用户密码
+        function resetPwd(uname){
+            let newPwd = prompt("请输入新密码：");
+            if(!newPwd || newPwd.trim()==""){
+                alert("密码不能为空");
+                return;
+            }
+            let user = users.find(x=>x.username===uname);
+            user.password = newPwd.trim();
+            saveData();
+            alert("密码重置成功！");
+            showUserList();
+        }
+
+        // 禁用/解禁账号
+        function toggleDisable(uname){
+            let user = users.find(x=>x.username===uname);
+            user.disabled = !user.disabled;
+            saveData();
+            alert(user.disabled?"已禁用该账号":"已解禁该账号");
+            showUserList();
+        }
+
         // 生成自定义邀请码
         function renderCreateInvite(){
             let code = "INV" + Date.now().toString().slice(-8);
@@ -505,7 +570,7 @@
                 return;
             }
             CODE_CONFIG[code] = {type:"自定义会员", days:d};
-            alert("生成成功！\n邀请码："+code+"\n有效期："+d+"天\n已自动生效，可发给用户注册");
+            alert("生成成功！\n邀请码："+code+"\n有效期："+d+"天\n已自动生效");
             renderAdmin();
         }
 
