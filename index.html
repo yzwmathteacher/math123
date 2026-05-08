@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>大湾区全科智能刷题系统</title>
+    <title>全科智能刷题系统</title>
     <style>
         *{box-sizing:border-box}
         body{background:#f5f7fa;margin:0;padding:15px;font-family:Arial,"微软雅黑"}
@@ -16,38 +16,42 @@
         .text-center{text-align:center}
         .mt10{margin-top:10px}
         .red{color:red}
+        .green{color:green}
         .tip{font-size:12px;color:#666;margin-top:5px}
         .pay-qrcode{width:200px;border-radius:8px;margin:10px auto;display:block}
+        table{width:100%;border-collapse:collapse;font-size:12px}
+        th,td{border:1px solid #eee;padding:6px;text-align:center}
+        th{background:#f5f7fa}
     </style>
 </head>
 <body>
     <div class="container" id="app"></div>
 
     <script>
-        // ========== 配置区 可自行修改 ==========
-        const ADMIN_PASS = "yzw13579";
+        // ==================== 配置区（自行修改）====================
+        const ADMIN_PASS = "awedsr134793";
         const WECHAT_ID = "475589411";
 
-        // 邀请码时效配置
+        // 邀请码对应套餐时效
         const CODE_CONFIG = {
-            "YZW2026": { type:"内部永久", days: 99999 },
-            "TIYAN2026": { type:"体验会员", days: 30 },
-            "YUE2026": { type:"月度会员", days: 30 },
-            "NIAN2026": { type:"年度会员", days: 365 }
+            "YZW2026":   { type:"内部永久会员", days: 99999 },
+            "TIYAN2026": { type:"30天体验会员", days: 30 },
+            "YUE2026":   { type:"月度会员", days: 30 },
+            "NIAN2026":  { type:"年度会员", days: 365 }
         };
 
-        // 本地存储
+        // 本地存储数据
         let users = JSON.parse(localStorage.getItem("users")) || [];
         let papers = JSON.parse(localStorage.getItem("papers")) || [];
         let questions = JSON.parse(localStorage.getItem("questions")) || [];
         let currentUser = null;
 
-        // 获取当前天数
+        // 获取当前时间天数
         function getNowDay(){
             return Math.floor(Date.now() / (1000*60*60*24));
         }
 
-        // ========== 首页 ==========
+        // ==================== 首页 ====================
         function renderHome(){
             document.getElementById("app").innerHTML = `
             <div class="card">
@@ -55,26 +59,26 @@
                 <button onclick="renderLogin()">学生登录</button>
                 <button class="btn-outline mt10" onclick="renderRegister()">学生注册</button>
                 <button class="btn-outline mt10" onclick="renderAdminLogin()">教师后台</button>
-                <div class="text-center tip mt10">无邀请码需付费开通会员</div>
+                <div class="text-center tip mt10">无官方邀请码请付费开通会员</div>
             </div>`;
         }
 
-        // ========== 注册页面 + 非空校验 + 邀请码时效绑定 ==========
+        // ==================== 注册页面 + 非空校验 + 绑定有效期 ====================
         function renderRegister(){
             document.getElementById("app").innerHTML = `
             <div class="card">
-                <div class="title">注册账号</div>
-                <input id="username" placeholder="请输入账号（必填）">
-                <input id="pwd" placeholder="请输入密码（必填）" type="password">
-                <input id="name" placeholder="请输入姓名（必填）">
-                <input id="grade" placeholder="请输入年级（必填）">
+                <div class="title">账号注册</div>
+                <input id="username" placeholder="账号（必填）">
+                <input id="pwd" placeholder="密码（必填）" type="password">
+                <input id="name" placeholder="姓名（必填）">
+                <input id="grade" placeholder="年级（必填）">
                 <input id="inviteCode" placeholder="邀请码（必填）">
                 <button onclick="doRegister()">立即注册</button>
                 <div class="text-center mt10">
                     <span onclick="renderHome()" style="color:#2c52ed;cursor:pointer">返回首页</span>
                 </div>
                 <div class="text-center mt10">
-                    <span onclick="renderPay()" style="color:red;cursor:pointer">没有邀请码？付费开通</span>
+                    <span onclick="renderPay()" style="color:red;cursor:pointer">没有邀请码？付费获取</span>
                 </div>
             </div>`;
         }
@@ -86,16 +90,16 @@
             let g = document.getElementById("grade").value.trim();
             let code = document.getElementById("inviteCode").value.trim();
 
-            // 修复BUG：全部不能为空
+            // 禁止空注册
             if(!u || !p || !n || !g || !code){
-                alert("请填写完整所有信息，全部为必填项！");
+                alert("所有栏目必须填写，不能为空！");
                 return;
             }
             if(users.find(x=>x.username === u)){
-                alert("账号已存在，请换一个账号");
+                alert("账号已存在，请换账号");
                 return;
             }
-            // 判断邀请码是否合法
+            // 邀请码是否合法
             if(!CODE_CONFIG[code]){
                 alert("邀请码无效！\n请先付费获取正规邀请码");
                 return;
@@ -104,7 +108,7 @@
             let nowDay = getNowDay();
             let validDays = CODE_CONFIG[code].days;
 
-            // 注册存入：账号、密码、姓名、年级、邀请码、注册天数、有效天数
+            // 写入用户数据
             users.push({
                 username:u,
                 password:p,
@@ -115,11 +119,12 @@
                 validDays: validDays
             });
             localStorage.setItem("users", JSON.stringify(users));
-            alert(`注册成功！\n当前套餐：${CODE_CONFIG[code].type}\n有效期：${validDays}天`);
+
+            alert(`注册成功！\n套餐类型：${CODE_CONFIG[code].type}\n有效时长：${validDays}天`);
             renderLogin();
         }
 
-        // ========== 登录 + 过期判断 ==========
+        // ==================== 登录 + 自动过期判断 ====================
         function renderLogin(){
             document.getElementById("app").innerHTML = `
             <div class="card">
@@ -145,11 +150,11 @@
                 return;
             }
 
-            // 校验是否过期
+            // 计算是否过期
             let nowDay = getNowDay();
-            let passDay = nowDay - user.regDay;
-            if(passDay > user.validDays){
-                alert("会员已过期！\n请重新付费获取新邀请码续期");
+            let usedDay = nowDay - user.regDay;
+            if(usedDay > user.validDays){
+                alert("会员已过期！\n请重新付费获取邀请码续期");
                 return;
             }
 
@@ -157,41 +162,40 @@
             renderPaperList();
         }
 
-        // ========== 付费页面 ==========
+        // ==================== 付费页面 ====================
         function renderPay(){
             document.getElementById("app").innerHTML = `
             <div class="card">
-                <div class="title">开通会员 获取邀请码</div>
-                <div style="line-height:1.8; font-size:15px;">
-                    ✅ 体验会员：<strong>9.9元 / 30天</strong> 邀请码：tiyan2026<br>
-                    ✅ 月度会员：<strong>25元 / 30天</strong> 邀请码：yue2026<br>
-                    ✅ 年度会员：<strong>99元 / 365天</strong> 邀请码：nian2026<br><br>
-                    <span class="red">⚠️ 付款备注：姓名+套餐</span>
+                <div class="title">会员付费开通</div>
+                <div style="line-height:1.8;font-size:15px;">
+                ✅ 体验30天  9.9元  邀请码：TIYAN2026<br>
+                ✅ 月度会员  25元   邀请码：YUE2026<br>
+                ✅ 年度会员  99元   邀请码：NIAN2026<br><br>
+                <span class="red">付款备注：姓名+年级+套餐</span>
                 </div>
 
                 <div class="text-center">
-                    <div style="font-weight:bold;margin:8px 0;">微信扫码付款</div>
-                    <img src="wx.png" class="pay-qrcode" alt="微信收款码">
+                    <div style="font-weight:bold;margin:8px 0;">微信扫码</div>
+                    <img src="wx.png" class="pay-qrcode">
                 </div>
-
                 <div class="text-center">
-                    <div style="font-weight:bold;margin:8px 0;">支付宝扫码付款</div>
-                    <img src="zfb.png" class="pay-qrcode" alt="支付宝收款码">
+                    <div style="font-weight:bold;margin:8px 0;">支付宝扫码</div>
+                    <img src="zfb.png" class="pay-qrcode">
                 </div>
 
-                <div style="font-size:12px;color:#666;text-align:center;margin-top:15px">
-                    付款后加微信：<strong>${WECHAT_ID}</strong> 核对领取邀请码
+                <div style="font-size:12px;color:#666;text-align:center;margin-top:15px;">
+                付款后加微信：<strong>${WECHAT_ID}</strong> 领取邀请码
                 </div>
 
                 <button class="mt10" onclick="renderHome()">返回首页</button>
             </div>`;
         }
 
-        // ========== 学生试卷 ==========
+        // ==================== 学生试卷中心 ====================
         function renderPaperList(){
             let html = `<div class="card"><div class="title">我的刷题试卷</div>`;
             if(papers.length === 0){
-                html += `<div class="text-center">暂无试卷</div>`;
+                html += `<div class="text-center">暂无试卷，请老师添加</div>`;
             }
             papers.forEach(p=>{
                 html += `<button class="mt10" onclick="doPaper(${p.id})">${p.title}</button>`;
@@ -200,18 +204,18 @@
             document.getElementById("app").innerHTML = html;
         }
 
-        // ========== 做题批改 ==========
+        // 做题与自动批改
         function doPaper(pid){
             let qs = questions.filter(q=>q.paper_id === pid);
             if(qs.length === 0){
-                alert("暂无题目");
+                alert("该试卷暂无题目");
                 return;
             }
             let html = `<div class="card"><div class="title">开始答题</div>`;
             qs.forEach((q,i)=>{
                 html += `<div style="margin-bottom:15px">
                 <div>${q.content}</div>
-                <input id="ans${i}" placeholder="请输入答案">
+                <input id="ans${i}" placeholder="输入答案">
                 </div>`;
             });
             html += `<button onclick="submitPaper(${pid})">提交批改</button></div>`;
@@ -226,7 +230,7 @@
                 if(val === q.answer.trim()) right++;
             });
             let score = Math.round(right / qs.length * 100);
-            alert(`完成！\n得分：${score}分\n正确：${right} 题\n错误：${qs.length-right} 题`);
+            alert(`测评完成\n得分：${score}分\n答对：${right}题\n答错：${qs.length-right}题`);
             renderPaperList();
         }
 
@@ -235,7 +239,7 @@
             renderHome();
         }
 
-        // ========== 教师后台 ==========
+        // ==================== 教师后台 ====================
         function renderAdminLogin(){
             document.getElementById("app").innerHTML = `
             <div class="card">
@@ -260,13 +264,15 @@
         function renderAdmin(){
             document.getElementById("app").innerHTML = `
             <div class="card">
-                <div class="title">教师管理后台</div>
+                <div class="title">教师管理中心</div>
                 <button onclick="createPaper()">新建试卷</button>
                 <button class="mt10" onclick="showPaperList()">管理题目</button>
+                <button class="mt10" onclick="showUserList()">查看所有注册用户</button>
                 <button class="mt10 btn-outline" onclick="renderHome()">退出</button>
             </div>`;
         }
 
+        // 新建试卷
         function createPaper(){
             let t = prompt("请输入试卷名称");
             if(!t) return;
@@ -275,31 +281,75 @@
             showPaperList();
         }
 
+        // 管理试卷题目
         function showPaperList(){
             let html = `<div class="card"><div class="title">试卷列表</div>`;
             papers.forEach(p=>{
                 html += `<div style="padding:10px;border-bottom:1px solid #eee">
                 <div>${p.title}</div>
-                <button style="padding:8px;margin-top:5px" onclick="addQuestion(${p.id})">添加题目</button>
+                <button style="padding:6px;margin-top:5px" onclick="addQuestion(${p.id})">添加题目</button>
                 </div>`;
             });
             html += `<button class="mt10 btn-outline" onclick="renderAdmin()">返回</button></div>`;
             document.getElementById("app").innerHTML = html;
         }
 
+        // 添加题目
         function addQuestion(pid){
-            let c = prompt("题目内容（可用___做填空）");
+            let c = prompt("题目内容（填空用___）");
             let a = prompt("标准答案");
             if(!c || !a) return;
-            questions.push({
-                id:Date.now(), paper_id:pid, content:c, answer:a
-            });
+            questions.push({id:Date.now(), paper_id:pid, content:c, answer:a});
             localStorage.setItem("questions", JSON.stringify(questions));
             alert("题目添加成功");
             showPaperList();
         }
 
-        // 启动
+        // 新增：查看所有用户 + 剩余有效期
+        function showUserList(){
+            if(users.length === 0){
+                document.getElementById("app").innerHTML = `
+                <div class="card">
+                    <div class="title">注册用户列表</div>
+                    <div class="text-center">暂无用户注册</div>
+                    <button class="mt10" onclick="renderAdmin()">返回</button>
+                </div>`;
+                return;
+            }
+
+            let nowDay = getNowDay();
+            let html = `
+            <div class="card">
+                <div class="title">注册用户列表</div>
+                <table>
+                    <tr>
+                        <th>姓名</th>
+                        <th>年级</th>
+                        <th>套餐</th>
+                        <th>剩余天数</th>
+                        <th>状态</th>
+                    </tr>`;
+
+            users.forEach(u=>{
+                let used = nowDay - u.regDay;
+                let left = u.validDays - used;
+                let status = left > 0 ? `<span class="green">正常</span>` : `<span class="red">已过期</span>`;
+                let typeName = CODE_CONFIG[u.inviteCode] ? CODE_CONFIG[u.inviteCode].type : "未知套餐";
+                html += `
+                <tr>
+                    <td>${u.name}</td>
+                    <td>${u.grade}</td>
+                    <td>${typeName}</td>
+                    <td>${left > 0 ? left : 0}天</td>
+                    <td>${status}</td>
+                </tr>`;
+            });
+
+            html += `</table><button class="mt10" onclick="renderAdmin()">返回</button></div>`;
+            document.getElementById("app").innerHTML = html;
+        }
+
+        // 初始化首页
         renderHome();
     </script>
 </body>
