@@ -3,533 +3,201 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>大湾区全科智能刷题系统 | 官方平台</title>
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
+    <title>全科刷题系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         *{box-sizing:border-box}
-        body{background:#f5f7fa;margin:0;padding:15px;font-family:Arial,"微软雅黑"}
+        body{background:#f5f7fa;margin:0;padding:15px;font-family:微软雅黑}
         .container{max-width:500px;margin:0 auto}
         .card{background:white;border-radius:16px;padding:25px;margin:15px 0;box-shadow:0 2px 10px #00000010}
         .title{text-align:center;font-size:22px;font-weight:bold;margin-bottom:20px;color:#2c52ed}
-        .sub-title{text-align:center;font-size:14px;color:#999;margin-bottom:15px}
-        input{width:100%;padding:12px;margin:8px 0;border:1px solid #ddd;border-radius:8px;font-size:15px}
-        button{width:100%;padding:13px;background:#2c52ed;color:white;border:none;border-radius:8px;font-size:16px;margin-top:8px}
+        input,textarea,select{width:100%;padding:12px;margin:8px 0;border:1px solid #ddd;border-radius:8px}
+        button{width:100%;padding:13px;background:#2c52ed;color:white;border:none;border-radius:8px;margin-top:8px}
         .btn-outline{background:white;color:#2c52ed;border:1px solid #2c52ed}
-        .text-center{text-align:center}
-        .mt10{margin-top:10px}
-        .red{color:red}
-        .green{color:green}
-        .blue{color:#2c52ed}
-        .tip{font-size:12px;color:#666;margin-top:5px}
-        .pay-qrcode{width:200px;border-radius:8px;margin:10px auto;display:block}
-        table{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0}
-        th,td{border:1px solid #eee;padding:6px;text-align:center}
-        th{background:#f5f7fa}
-        .tag{display:inline-block;padding:3px 8px;border-radius:4px;font-size:12px;color:#fff;margin:2px}
+        .tip{font-size:12px;color:#666}
+        .tag{display:inline-block;padding:3px 8px;border-radius:4px;color:#fff}
         .tag-sx{background:#2c52ed}
-        .tag-yw{background:#4CAF50}
-        .tag-yy{background:#ff9800}
-        .item-box{padding:12px;border-bottom:1px solid #eee;margin:5px 0;border-radius:8px}
+        .item-box{padding:12px;border-bottom:1px solid #eee;margin:5px 0}
+        .q-img{max-width:100%;max-height:220px;border-radius:8px;margin:8px 0}
     </style>
 </head>
 <body>
     <div class="container" id="app"></div>
-
     <script>
-        // 配置
-        const ADMIN_PASS = "awedsr134793";
-        const WECHAT_ID = "475589411"; // 你的微信号
-        const SYS_NOTICE = "欢迎使用大湾区全科智能刷题系统！\n付费请联系管理员微信，切勿私下转账。";
+        const ADMIN_PASS = "123456";
+        const SUBJECT_LIST = [{key:"math",name:"数学",cls:"tag-sx"}];
+        const QUESTION_TYPES = {1:"单选题",2:"多选题",3:"判断题",4:"填空题"};
 
-        // 邀请码套餐（后台生成，前台不显示）
-        const CODE_CONFIG = {
-            "YZW2026":{type:"内部永久会员",days:99999}
-        };
-
-        // 学科
-        const SUBJECT_LIST = [
-            {key:"math",name:"数学",cls:"tag-sx"},
-            {key:"chinese",name:"语文",cls:"tag-yw"},
-            {key:"english",name:"英语",cls:"tag-yy"}
-        ];
-
-        // 读取本地数据
-        let users = JSON.parse(localStorage.getItem("users")) || [];
+        let users = [];
         let papers = JSON.parse(localStorage.getItem("papers")) || [];
         let questions = JSON.parse(localStorage.getItem("questions")) || [];
-        let wrongBooks = JSON.parse(localStorage.getItem("wrongBooks")) || [];
         let currentUser = null;
         let nowPaperId = 0;
+        let tempImage = "";
 
-        // 保存数据
-        function saveData(){
-            localStorage.setItem("users",JSON.stringify(users));
-            localStorage.setItem("papers",JSON.stringify(papers));
-            localStorage.setItem("questions",JSON.stringify(questions));
-            localStorage.setItem("wrongBooks",JSON.stringify(wrongBooks));
-        }
-
-        // 天数转日期
-        function getNowDay(){return Math.floor(Date.now()/(1000*60*60*24));}
-        function dayToDate(dayNum){
-            let t = dayNum * 86400000;
-            let d = new Date(t);
-            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        // ===================== 【核心：导出 + 导入 同步数据】 =====================
+        function exportData() {
+            let data = { papers, questions };
+            let blob = new Blob([JSON.stringify(data)], {type:"application/json"});
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement("a");
+            a.href = url;
+            a.download = "题库数据.json";
+            a.click();
+            alert("✅ 导出成功！发给微信即可同步");
         }
 
-        // 公告弹窗
-        function showNotice(){
-            let div = document.createElement("div");
-            div.style="position:fixed;top:0;left:0;right:0;bottom:0;background:#00000088;display:flex;align-items:center;justify-content:center;z-index:999;padding:20px;";
-            div.innerHTML = `
-                <div style="background:#fff;border-radius:16px;padding:20px;max-width:400px;width:100%;text-align:center;">
-                    <div class="title">系统公告</div>
-                    <div style="white-space:pre-line;line-height:1.8;margin:15px 0;">${SYS_NOTICE}</div>
-                    <button onclick="this.parentElement.parentElement.remove()">我已知晓</button>
-                </div>
-            `;
-            document.body.appendChild(div);
-        }
-
-        // 首页
-        function renderHome(){
-            document.getElementById("app").innerHTML = `
-                <div class="card">
-                    <div class="title">全科智能刷题系统</div>
-                    <div class="sub-title">中小学全科在线刷题平台</div>
-                    <button onclick="renderLogin()">学生登录</button>
-                    <button class="btn-outline mt10" onclick="renderRegister()">学生注册</button>
-                    <button class="btn-outline mt10" onclick="renderAdminLogin()">教师后台</button>
-                    <div class="text-center tip mt10">无邀请码请联系管理员付费开通</div>
-                </div>
-            `;
-            setTimeout(showNotice,200);
-        }
-
-        // 注册
-        function renderRegister(){
-            document.getElementById("app").innerHTML = `
-                <div class="card">
-                    <div class="title">账号注册</div>
-                    <input id="regUser" placeholder="账号">
-                    <input id="regPwd" placeholder="密码" type="password">
-                    <input id="regName" placeholder="姓名">
-                    <input id="regGrade" placeholder="年级">
-                    <input id="regCode" placeholder="邀请码">
-                    <button onclick="doRegister()">立即注册</button>
-                    <div class="text-center mt10"><span style="color:#2c52ed;cursor:pointer" onclick="renderHome()">返回首页</span></div>
-                    <div class="text-center mt10"><span style="color:red;cursor:pointer" onclick="renderPay()">没有邀请码？付费获取</span></div>
-                </div>
-            `;
-        }
-        function doRegister(){
-            let u = document.getElementById("regUser").value.trim();
-            let p = document.getElementById("regPwd").value.trim();
-            let n = document.getElementById("regName").value.trim();
-            let g = document.getElementById("regGrade").value.trim();
-            let c = document.getElementById("regCode").value.trim();
-            if(!u||!p||!n||!g||!c) return alert("所有栏目不能为空！");
-            if(users.find(x=>x.username===u)) return alert("账号已存在");
-            if(!CODE_CONFIG[c]) return alert("邀请码无效，请先付费获取");
-
-            let now = getNowDay();
-            users.push({
-                username:u,password:p,name:n,grade:g,inviteCode:c,
-                regDay:now,validDays:CODE_CONFIG[c].days,disabled:false
-            });
-            saveData();
-            alert("注册成功！");
-            renderLogin();
-        }
-
-        // 登录
-        function renderLogin(){
-            document.getElementById("app").innerHTML = `
-                <div class="card">
-                    <div class="title">用户登录</div>
-                    <input id="logUser" placeholder="账号">
-                    <input id="logPwd" placeholder="密码" type="password">
-                    <button onclick="doLogin()">登录</button>
-                    <div class="text-center mt10"><span style="color:#2c52ed;cursor:pointer" onclick="renderRegister()">没有账号去注册</span></div>
-                </div>
-            `;
-        }
-        function doLogin(){
-            let u = document.getElementById("logUser").value.trim();
-            let p = document.getElementById("logPwd").value.trim();
-            let user = users.find(x=>x.username===u&&x.password===p);
-            if(!user) return alert("账号密码错误");
-            if(user.disabled) return alert("账号已被禁用");
-            let now = getNowDay();
-            if(now - user.regDay > user.validDays) return alert("会员已过期，请续期");
-            currentUser = user;
-            renderStudentMain();
-        }
-
-        // 学生主页
-        function renderStudentMain(){
-            let now = getNowDay();
-            let left = currentUser.validDays - (now - currentUser.regDay);
-            let endDate = dayToDate(currentUser.regDay + currentUser.validDays);
-            let subHtml = "";
-            SUBJECT_LIST.forEach(s=>{
-                subHtml += `<button onclick="renderPaperListBySub('${s.key}')">${s.name}刷题</button>`;
-            });
-            document.getElementById("app").innerHTML = `
-                <div class="card">
-                    <div class="title">欢迎 ${currentUser.name}</div>
-                    <div class="text-center" style="line-height:1.8">
-                        年级：${currentUser.grade}<br>
-                        剩余天数：<span class="red">${left>0?left:0}</span><br>
-                        到期日期：<span class="blue">${endDate}</span>
-                    </div>
-                    ${subHtml}
-                    <button class="btn-outline mt10" onclick="renderWrongBook()">我的错题本</button>
-                    <button class="btn-outline mt10" onclick="currentUser=null;renderHome()">退出登录</button>
-                </div>
-            `;
-        }
-
-        // 按学科展示试卷
-        function renderPaperListBySub(subKey){
-            let sub = SUBJECT_LIST.find(x=>x.key===subKey);
-            let list = papers.filter(p=>p.subject===subKey);
-            let html = `<div class="card"><div class="title">${sub.name}试卷列表</div>`;
-            if(list.length===0){
-                html += `<div class="text-center tip">暂无试卷</div>`;
-            }else{
-                list.forEach(p=>{
-                    html += `<div class="item-box"><button onclick="startExam(${p.id})">${p.title}</button></div>`;
-                });
-            }
-            html += `<button class="btn-outline mt10" onclick="renderStudentMain()">返回</button></div>`;
-            document.getElementById("app").innerHTML = html;
-        }
-
-        // 开始答题
-        function startExam(pid){
-            let qList = questions.filter(q=>q.paper_id===pid);
-            if(qList.length===0) return alert("该试卷暂无题目");
-            let html = `<div class="card"><div class="title">开始答题</div>`;
-            qList.forEach((q,i)=>{
-                html += `
-                    <div style="margin:15px 0;">
-                        <div>第${i+1}题：${q.content}</div>
-                        <input id="ans_${q.id}" placeholder="填写答案">
-                    </div>
-                `;
-            });
-            html += `<button onclick="submitExam(${pid})">提交试卷</button></div>`;
-            document.getElementById("app").innerHTML = html;
-        }
-
-        // 提交试卷 + 收录错题
-        function submitExam(pid){
-            let qList = questions.filter(q=>q.paper_id===pid);
-            let right = 0;
-            qList.forEach(q=>{
-                let val = document.getElementById("ans_"+q.id).value.trim();
-                if(val === q.answer.trim()){
-                    right++;
-                }else{
-                    let has = wrongBooks.find(w=>w.username===currentUser.username&&w.questionId===q.id);
-                    if(!has){
-                        wrongBooks.push({username:currentUser.username,questionId:q.id,addTime:getNowDay()});
-                    }
-                }
-            });
-            saveData();
-            let score = Math.round(right/qList.length*100);
-            alert(`得分：${score}分\n答对${right}题，答错${qList.length-right}题\n错题已自动加入错题本`);
-            renderStudentMain();
-        }
-
-        // 错题本
-        function renderWrongBook(){
-            let myWrong = wrongBooks.filter(w=>w.username===currentUser.username);
-            if(myWrong.length===0){
-                document.getElementById("app").innerHTML = `
-                    <div class="card">
-                        <div class="title">我的错题本</div>
-                        <div class="text-center tip">暂无错题</div>
-                        <button class="mt10" onclick="renderStudentMain()">返回</button>
-                    </div>
-                `;
-                return;
-            }
-            let html = `<div class="card"><div class="title">我的错题本</div>`;
-            myWrong.forEach(item=>{
-                let q = questions.find(x=>x.id===item.questionId);
-                let sub = SUBJECT_LIST.find(x=>x.key===q.subject);
-                html += `
-                    <div class="item-box">
-                        <span class="tag ${sub.cls}">${sub.name}</span>
-                        <div style="margin:8px 0;">${q.content}</div>
-                        <div class="tip">正确答案：${q.answer}</div>
-                        <button style="margin-top:5px" onclick="redoQuestion(${q.id})">重做此题</button>
-                    </div>
-                `;
-            });
-            html += `<button class="btn-outline mt10" onclick="clearMyWrong()">清空错题</button>
-                     <button class="btn-outline mt10" onclick="renderStudentMain()">返回</button></div>`;
-            document.getElementById("app").innerHTML = html;
-        }
-
-        // 重做错题
-        function redoQuestion(qid){
-            let q = questions.find(x=>x.id===qid);
-            document.getElementById("app").innerHTML = `
-                <div class="card">
-                    <div class="title">重做错题</div>
-                    <div style="margin:15px 0;">${q.content}</div>
-                    <input id="redoAns" placeholder="输入答案">
-                    <button onclick="checkRedo(${qid})">核对答案</button>
-                </div>
-            `;
-        }
-        function checkRedo(qid){
-            let q = questions.find(x=>x.id===qid);
-            let val = document.getElementById("redoAns").value.trim();
-            if(val === q.answer.trim()){
-                wrongBooks = wrongBooks.filter(w=>!(w.username===currentUser.username&&w.questionId===qid));
-                saveData();
-                alert("回答正确，已移出错题本");
-            }else{
-                alert("答案错误，继续加油");
-            }
-            renderWrongBook();
-        }
-        function clearMyWrong(){
-            if(!confirm("确定清空所有错题？")) return;
-            wrongBooks = wrongBooks.filter(w=>w.username!==currentUser.username);
-            saveData();
-            alert("已清空");
-            renderWrongBook();
-        }
-
-        // 【修复版】付费页面：只显示套餐+收款码，不显示邀请码
-        function renderPay(){
-            document.getElementById("app").innerHTML = `
-                <div class="card">
-                    <div class="title">会员付费开通</div>
-                    <div style="line-height:2; text-align:left; padding:0 10px;">
-                        <div style="display:flex;align-items:center;margin:10px 0;">
-                            <span class="green" style="font-size:20px; margin-right:8px;">✅</span>
-                            <span>30天体验会员 —— 9.9元</span>
-                        </div>
-                        <div style="display:flex;align-items:center;margin:10px 0;">
-                            <span class="green" style="font-size:20px; margin-right:8px;">✅</span>
-                            <span>月度会员 —— 25元</span>
-                        </div>
-                        <div style="display:flex;align-items:center;margin:10px 0;">
-                            <span class="green" style="font-size:20px; margin-right:8px;">✅</span>
-                            <span>年度会员 —— 99元</span>
-                        </div>
-                        <div style="display:flex;align-items:center;margin:10px 0;">
-                            <span class="green" style="font-size:20px; margin-right:8px;">✅</span>
-                            <span>永久会员 —— 199元</span>
-                        </div>
-                    </div>
-                    <div class="text-center" style="margin-top:20px;">
-                        <div style="font-weight:bold; margin-bottom:8px;">微信扫码付款（备注：姓名+套餐）</div>
-                        <img src="wx.png" class="pay-qrcode" alt="微信收款码">
-                    </div>
-                    <div class="text-center" style="margin-top:15px;">
-                        <div style="font-weight:bold; margin-bottom:8px;">支付宝扫码付款（备注：姓名+套餐）</div>
-                        <img src="zfb.png" class="pay-qrcode" alt="支付宝收款码">
-                    </div>
-                    <div style="font-size:12px;color:#666;text-align:center;margin-top:15px;line-height:1.6;">
-                        付款后请添加微信：<strong>${WECHAT_ID}</strong><br>
-                        发送付款截图+姓名+年级，审核通过后发放专属邀请码
-                    </div>
-                    <button class="mt10" onclick="renderHome()">返回首页</button>
-                </div>
-            `;
-        }
-
-        // 教师后台登录
-        function renderAdminLogin(){
-            document.getElementById("app").innerHTML = `
-                <div class="card">
-                    <div class="title">教师后台登录</div>
-                    <input id="adminPwd" placeholder="管理员密码" type="password">
-                    <button onclick="checkAdminLogin()">登录后台</button>
-                    <div class="text-center mt10"><span style="color:#2c52ed;cursor:pointer" onclick="renderHome()">返回</span></div>
-                </div>
-            `;
-        }
-        function checkAdminLogin(){
-            let pwd = document.getElementById("adminPwd").value.trim();
-            if(pwd === ADMIN_PASS){
+        function importData(e) {
+            let file = e.target.files[0];
+            let reader = new FileReader();
+            reader.onload = function(ev) {
+                let data = JSON.parse(ev.target.result);
+                papers = data.papers || [];
+                questions = data.questions || [];
+                localStorage.setItem("papers", JSON.stringify(papers));
+                localStorage.setItem("questions", JSON.stringify(questions));
+                alert("✅ 导入同步成功！");
                 renderAdminMain();
-            }else{
-                alert("密码错误");
-            }
+            };
+            reader.readAsText(file);
         }
 
-        // 教师后台主页
-        function renderAdminMain(){
+        function saveAll() {
+            localStorage.setItem("papers", JSON.stringify(papers));
+            localStorage.setItem("questions", JSON.stringify(questions));
+        }
+
+        // ===================== 页面 =====================
+        function renderHome() {
             document.getElementById("app").innerHTML = `
-                <div class="card">
-                    <div class="title">教师管理中心</div>
-                    <button onclick="adminCreatePaper()">新建试卷</button>
-                    <button class="mt10" onclick="adminPaperList()">试卷/题目管理</button>
-                    <button class="mt10" onclick="adminUserList()">用户管理(续期/禁用)</button>
-                    <button class="mt10" onclick="adminCreateInvite()">生成自定义邀请码</button>
-                    <button class="btn-outline mt10" onclick="renderHome()">退出后台</button>
-                </div>
-            `;
-        }
-
-        // 新建试卷
-        function adminCreatePaper(){
-            let name = prompt("请输入试卷名称：");
-            if(!name) return;
-            let sub = prompt("请输入学科编码：\nmath 数学\nchinese 语文\nenglish 英语");
-            if(!SUBJECT_LIST.find(x=>x.key===sub)) return alert("学科编码错误");
-            papers.push({id:Date.now(),title:name,subject:sub});
-            saveData();
-            alert("试卷创建成功！");
-            adminPaperList();
-        }
-
-        // 后台试卷列表
-        function adminPaperList(){
-            let html = `<div class="card"><div class="title">试卷列表</div>`;
-            if(papers.length===0){
-                html += `<div class="text-center tip">暂无试卷，请先新建</div>`;
-            }else{
-                papers.forEach(p=>{
-                    let sub = SUBJECT_LIST.find(x=>x.key===p.subject);
-                    let qNum = questions.filter(q=>q.paper_id===p.id).length;
-                    html += `
-                        <div class="item-box">
-                            <div>${p.title} <span class="tag ${sub.cls}">${sub.name}</span> 共${qNum}题</div>
-                            <button style="margin-top:5px" onclick="adminManagePaper(${p.id})">管理题目</button>
-                        </div>
-                    `;
-                });
-            }
-            html += `<button class="btn-outline mt10" onclick="renderAdminMain()">返回</button></div>`;
-            document.getElementById("app").innerHTML = html;
-        }
-
-        // 管理单套试卷题目
-        function adminManagePaper(pid){
-            nowPaperId = pid;
-            let paper = papers.find(p=>p.id===pid);
-            let qList = questions.filter(q=>q.paper_id===pid);
-            let html = `<div class="card"><div class="title">${paper.title} 题目管理</div>`;
-            if(qList.length===0){
-                html += `<div class="text-center tip">暂无题目</div>`;
-            }else{
-                qList.forEach(q=>{
-                    html += `
-                        <div class="item-box">
-                            <div>题目：${q.content}</div>
-                            <div class="tip">答案：${q.answer}</div>
-                            <button style="margin-top:5px" onclick="adminDelQuestion(${q.id})">删除此题</button>
-                        </div>
-                    `;
-                });
-            }
-            html += `
-                <button onclick="adminAddQuestion()">添加新题目</button>
-                <button class="btn-outline mt10" onclick="adminPaperList()">返回试卷列表</button>
+            <div class="card">
+                <div class="title">刷题系统</div>
+                <button onclick="renderAdminLogin()">教师后台</button>
             </div>`;
+        }
+
+        function renderAdminLogin() {
+            document.getElementById("app").innerHTML = `
+            <div class="card">
+                <div class="title">教师登录</div>
+                <input id="pwd" type="password" placeholder="密码：123456">
+                <button onclick="checkAdmin()">登录</button>
+            </div>`;
+        }
+
+        function checkAdmin() {
+            if (document.getElementById("pwd").value === ADMIN_PASS) {
+                renderAdminMain();
+            }
+        }
+
+        function renderAdminMain() {
+            document.getElementById("app").innerHTML = `
+            <div class="card">
+                <div class="title">管理后台</div>
+                <button onclick="adminCreatePaper()">新建试卷</button>
+                <button class="mt10" onclick="adminPaperList()">试卷管理</button>
+                <button style="background:#e6551c" onclick="adminOcrPage()">📷 图片识别试题</button>
+                
+                <button style="background:#009688" onclick="exportData()">💾 一键导出数据</button>
+                <label class="btn-outline"><input type="file" hidden onchange="importData(event)"> 📂 一键导入数据</label>
+                
+                <button class="mt10" onclick="renderHome()">返回</button>
+            </div>`;
+        }
+
+        function adminCreatePaper() {
+            let name = prompt("试卷名");
+            if (name) {
+                papers.push({ id: Date.now(), title: name, subject: "math" });
+                saveAll();
+                adminPaperList();
+            }
+        }
+
+        function adminPaperList() {
+            let html = `<div class="card"><div class="title">试卷</div>`;
+            papers.forEach(p => {
+                html += `<div class="item-box">
+                    ${p.title}
+                    <button onclick="adminManagePaper(${p.id})">管理题目</button>
+                </div>`;
+            });
+            html += `<button onclick="renderAdminMain()">返回</button></div>`;
             document.getElementById("app").innerHTML = html;
         }
 
-        // 添加题目
-        function adminAddQuestion(){
-            let content = prompt("请输入题目内容（填空用___）：");
-            let answer = prompt("请输入标准答案：");
-            if(!content||!answer) return alert("题目和答案不能为空");
-            let paper = papers.find(p=>p.id===nowPaperId);
-            questions.push({
-                id:Date.now(),paper_id:nowPaperId,subject:paper.subject,
-                content:content.trim(),answer:answer.trim()
+        function adminManagePaper(pid) {
+            nowPaperId = pid;
+            let list = questions.filter(q => q.paper_id == pid);
+            let html = `<div class="card"><div class="title">题目</div>`;
+            list.forEach(q => {
+                html += `<div class="item-box">
+                    ${q.content}
+                    ${q.image ? `<img src="${q.image}" class="q-img">` : ""}
+                    答案：${q.answer}
+                </div>`;
             });
-            saveData();
-            alert("题目添加成功");
-            adminManagePaper(nowPaperId);
-        }
-
-        // 删除题目
-        function adminDelQuestion(qid){
-            if(!confirm("确定删除该题目？")) return;
-            questions = questions.filter(q=>q.id!==qid);
-            saveData();
-            alert("已删除");
-            adminManagePaper(nowPaperId);
-        }
-
-        // 用户管理
-        function adminUserList(){
-            let now = getNowDay();
-            let html = `<div class="card"><div class="title">用户管理</div>`;
-            users.forEach(u=>{
-                let left = u.validDays - (now - u.regDay);
-                let endDate = dayToDate(u.regDay + u.validDays);
-                let status = u.disabled ? "<span class='red'>已禁用</span>" : (left>0?"<span class='green'>正常</span>":"<span class='red'>已过期</span>");
-                html += `
-                    <div class="item-box">
-                        <div>姓名：${u.name} | 年级：${u.grade}</div>
-                        <div>到期：${endDate} | 状态：${status}</div>
-                        <button style="margin-top:5px" onclick="adminAddDay('${u.username}')">续期天数</button>
-                        <button style="margin-top:5px" onclick="adminResetPwd('${u.username}')">重置密码</button>
-                        <button style="margin-top:5px" onclick="adminToggleDisable('${u.username}')">${u.disabled?'解禁账号':'禁用账号'}</button>
-                    </div>
-                `;
-            });
-            html += `<button class="btn-outline mt10" onclick="renderAdminMain()">返回</button></div>`;
+            html += `<button onclick="adminAddQuestion()">手动添加</button>
+                     <button style="background:#e6551c" onclick="adminOcrToPaper(${pid})">图片识别添加</button>
+                     <button onclick="adminPaperList()">返回</button></div>`;
             document.getElementById("app").innerHTML = html;
         }
 
-        // 用户续期
-        function adminAddDay(uname){
-            let day = prompt("请输入要增加的天数：");
-            let num = parseInt(day);
-            if(isNaN(num)||num<=0) return alert("请输入正确数字");
-            let user = users.find(x=>x.username===uname);
-            user.validDays += num;
-            saveData();
-            alert("续期成功");
-            adminUserList();
-        }
-        // 重置密码
-        function adminResetPwd(uname){
-            let pwd = prompt("请输入新密码：");
-            if(!pwd) return alert("密码不能为空");
-            let user = users.find(x=>x.username===uname);
-            user.password = pwd.trim();
-            saveData();
-            alert("密码重置成功");
-            adminUserList();
-        }
-        // 禁用解禁
-        function adminToggleDisable(uname){
-            let user = users.find(x=>x.username===uname);
-            user.disabled = !user.disabled;
-            saveData();
-            alert(user.disabled?"已禁用":"已解禁");
-            adminUserList();
+        function adminAddQuestion() {
+            let content = prompt("题目");
+            let ans = prompt("答案");
+            if (content && ans) {
+                questions.push({
+                    id: Date.now(), paper_id: nowPaperId, content, answer: ans, image: tempImage || ""
+                });
+                tempImage = "";
+                saveAll();
+                adminManagePaper(nowPaperId);
+            }
         }
 
-        // 生成自定义邀请码（后台专用）
-        function adminCreateInvite(){
-            let code = "INV"+Date.now().toString().slice(-6);
-            let day = prompt("请输入有效天数：\n30=月会员，365=年会员，99999=永久");
-            let d = parseInt(day);
-            if(isNaN(d)||d<=0) return alert("天数错误");
-            CODE_CONFIG[code] = {type:"自定义会员",days:d};
-            alert("生成成功！\n邀请码："+code+"\n有效期："+d+"天\n请复制发给用户");
+        // 图片识别
+        function adminOcrPage() {
+            document.getElementById("app").innerHTML = `
+            <div class="card">
+                <div class="title">图片识别</div>
+                <input type="file" accept="image/*" onchange="previewImage(event)">
+                <img id="p" style="max-width:100%">
+                <button onclick="doOCR()">识别</button>
+            </div>`;
+        }
+
+        function previewImage(e) {
+            let reader = new FileReader();
+            reader.onload = ev => {
+                tempImage = ev.target.result;
+                document.getElementById("p").src = tempImage;
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        }
+
+        async function doOCR() {
+            alert("识别中…");
+            const { data: { text } } = await Tesseract.recognize(tempImage, 'chi_sim');
+            document.getElementById("app").innerHTML = `
+            <div class="card">
+                <textarea id="c" style="width:100%;height:100px">${text}</textarea>
+                <input id="a" placeholder="答案">
+                <button onclick="saveOcr()">保存题目</button>
+            </div>`;
+        }
+
+        function saveOcr() {
+            let c = document.getElementById("c").value;
+            let a = document.getElementById("a").value;
+            questions.push({ id: Date.now(), paper_id: nowPaperId, content: c, answer: a, image: tempImage });
+            tempImage = "";
+            saveAll();
             renderAdminMain();
         }
 
-        // 初始化
         renderHome();
     </script>
 </body>
