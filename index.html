@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>大湾区全科智能刷题系统</title>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         *{box-sizing:border-box}
         body{background:#f5f7fa;margin:0;padding:15px;font-family:Arial,"微软雅黑"}
@@ -23,10 +22,6 @@
         .green{color:green}
         .blue{color:#2c52ed}
         .tip{font-size:12px;color:#666;margin-top:5px}
-        .pay-qrcode{width:200px;border-radius:8px;margin:10px auto;display:block}
-        table{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0}
-        th,td{border:1px solid #eee;padding:6px;text-align:center}
-        th{background:#f5f7fa}
         .tag{display:inline-block;padding:3px 8px;border-radius:4px;font-size:12px;color:#fff;margin:2px}
         .tag-sx{background:#2c52ed}
         .tag-yw{background:#4CAF50}
@@ -64,21 +59,16 @@
         let nowPaperId = 0;
         let tempImage = "";
 
-        // ===================== 导出 / 导入 同步功能（新增） =====================
+        // ===================== 导出 / 导入 同步 =====================
         function exportAllData() {
-            const data = {
-                users: users,
-                papers: papers,
-                questions: questions,
-                wrongBooks: wrongBooks
-            };
+            const data = { users, papers, questions, wrongBooks };
             const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = "刷题系统完整数据.json";
+            a.download = "刷题系统数据.json";
             a.click();
-            alert("✅ 导出成功！发送到微信即可手机电脑互通");
+            alert("✅ 导出成功！");
         }
 
         function importAllData(e) {
@@ -97,8 +87,7 @@
                     localStorage.setItem("papers", JSON.stringify(papers));
                     localStorage.setItem("questions", JSON.stringify(questions));
                     localStorage.setItem("wrongBooks", JSON.stringify(wrongBooks));
-
-                    alert("✅ 数据同步成功！所有题目已互通");
+                    alert("✅ 同步成功");
                     renderAdminMain();
                 } catch (err) {
                     alert("❌ 导入失败");
@@ -114,11 +103,10 @@
             localStorage.setItem("wrongBooks", JSON.stringify(wrongBooks));
         }
 
-        // ===================== 工具函数 =====================
+        // ===================== 工具 =====================
         function getNowDay(){return Math.floor(Date.now()/(1000*60*60*24));}
         function dayToDate(dayNum){
-            let t = dayNum * 86400000;
-            let d = new Date(t);
+            let d = new Date(dayNum * 86400000);
             return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
         }
 
@@ -135,22 +123,19 @@
             document.body.appendChild(div);
         }
 
-        // ===================== 页面渲染 =====================
+        // ===================== 页面 =====================
         function renderHome(){
             document.getElementById("app").innerHTML = `
                 <div class="card">
                     <div class="title">全科智能刷题系统</div>
-                    <div class="sub-title">中小学全科在线刷题平台</div>
                     <button onclick="renderLogin()">学生登录</button>
                     <button class="btn-outline mt10" onclick="renderRegister()">学生注册</button>
                     <button class="btn-outline mt10" onclick="renderAdminLogin()">教师后台</button>
-                    <div class="text-center tip mt10">无邀请码请联系管理员付费开通</div>
                 </div>
             `;
             setTimeout(showNotice,200);
         }
 
-        // 注册
         function renderRegister(){
             document.getElementById("app").innerHTML = `
                 <div class="card">
@@ -161,8 +146,7 @@
                     <input id="regGrade" placeholder="年级">
                     <input id="regCode" placeholder="邀请码">
                     <button onclick="doRegister()">立即注册</button>
-                    <div class="text-center mt10"><span style="color:#2c52ed;cursor:pointer" onclick="renderHome()">返回首页</span></div>
-                    <div class="text-center mt10"><span style="color:red;cursor:pointer" onclick="renderPay()">没有邀请码？付费获取</span></div>
+                    <div class="text-center mt10"><span style="cursor:pointer" onclick="renderHome()">返回首页</span></div>
                 </div>
             `;
         }
@@ -174,13 +158,11 @@
             let c = document.getElementById("regCode").value.trim();
             if(!u||!p||!n||!g||!c) return alert("所有栏目不能为空！");
             if(users.find(x=>x.username===u)) return alert("账号已存在");
-            if(!CODE_CONFIG[c]) return alert("邀请码无效，请先付费获取");
-            let now = getNowDay();
-            users.push({username:u,password:p,name:n,grade:g,inviteCode:c,regDay:now,validDays:CODE_CONFIG[c].days,disabled:false});
+            if(!CODE_CONFIG[c]) return alert("邀请码无效");
+            users.push({username:u,password:p,name:n,grade:g,inviteCode:c,regDay:getNowDay(),validDays:CODE_CONFIG[c].days,disabled:false});
             saveData(); alert("注册成功！"); renderLogin();
         }
 
-        // 登录
         function renderLogin(){
             document.getElementById("app").innerHTML = `
                 <div class="card">
@@ -188,7 +170,6 @@
                     <input id="logUser" placeholder="账号">
                     <input id="logPwd" placeholder="密码" type="password">
                     <button onclick="doLogin()">登录</button>
-                    <div class="text-center mt10"><span style="color:#2c52ed;cursor:pointer" onclick="renderRegister()">没有账号去注册</span></div>
                 </div>
             `;
         }
@@ -198,15 +179,12 @@
             let user = users.find(x=>x.username===u&&x.password===p);
             if(!user) return alert("账号密码错误");
             if(user.disabled) return alert("账号已被禁用");
-            let now = getNowDay();
-            if(now - user.regDay > user.validDays) return alert("会员已过期，请续期");
+            if(getNowDay() - user.regDay > user.validDays) return alert("会员已过期");
             currentUser = user; renderStudentMain();
         }
 
-        // 学生主页
         function renderStudentMain(){
-            let now = getNowDay();
-            let left = currentUser.validDays - (now - currentUser.regDay);
+            let left = currentUser.validDays - (getNowDay() - currentUser.regDay);
             let endDate = dayToDate(currentUser.regDay + currentUser.validDays);
             let subHtml = "";
             SUBJECT_LIST.forEach(s=>{subHtml+=`<button onclick="renderPaperListBySub('${s.key}')">${s.name}刷题</button>`;});
@@ -225,7 +203,6 @@
             `;
         }
 
-        // 试卷列表
         function renderPaperListBySub(subKey){
             let sub = SUBJECT_LIST.find(x=>x.key===subKey);
             let list = papers.filter(p=>p.subject===subKey);
@@ -236,7 +213,6 @@
             document.getElementById("app").innerHTML = html;
         }
 
-        // 开始考试
         function startExam(pid){
             let qList = questions.filter(q=>q.paper_id===pid);
             if(qList.length===0) return alert("该试卷暂无题目");
@@ -261,7 +237,6 @@
             MathJax.typeset();
         }
 
-        // 提交试卷
         function submitExam(pid){
             let qList = questions.filter(q=>q.paper_id===pid);
             let right = 0;
@@ -280,7 +255,6 @@
             renderStudentMain();
         }
 
-        // 错题本
         function renderWrongBook(){
             let myWrong=wrongBooks.filter(w=>w.username===currentUser.username);
             if(myWrong.length===0){
@@ -304,7 +278,6 @@
             MathJax.typeset();
         }
 
-        // 重做错题
         function redoQuestion(qid){
             let q=questions.find(x=>x.id===qid);
             let html=`<div class="card"><div class="title">重做错题</div>`;
@@ -327,37 +300,19 @@
         }
         function clearMyWrong(){if(!confirm("确定清空？"))return;wrongBooks=wrongBooks.filter(w=>w.username!==currentUser.username);saveData();alert("已清空");renderWrongBook();}
 
-        // 付费页面
-        function renderPay(){
-            document.getElementById("app").innerHTML=`
-            <div class="card">
-                <div class="title">会员开通</div>
-                <div style="line-height:2">
-                <div>✅ 30天体验 —— 9.9元</div>
-                <div>✅ 月度会员 —— 25元</div>
-                <div>✅ 年度会员 —— 99元</div>
-                <div>✅ 永久会员 —— 199元</div>
-                </div>
-                <div class="text-center mt15"><strong>微信：${WECHAT_ID}</strong></div>
-                <button onclick="renderHome()">返回</button>
-            </div>`;
-        }
-
-        // 管理员登录
+        // ===================== 管理员 =====================
         function renderAdminLogin(){
             document.getElementById("app").innerHTML=`
             <div class="card">
                 <div class="title">教师后台</div>
                 <input id="adminPwd" type="password" placeholder="密码">
                 <button onclick="checkAdminLogin()">登录</button>
-                <button class="btn-outline mt10" onclick="renderHome()">返回</button>
             </div>`;
         }
         function checkAdminLogin(){
             if(document.getElementById("adminPwd").value===ADMIN_PASS)renderAdminMain();else alert("密码错误");
         }
 
-        // 管理员主页
         function renderAdminMain(){
             document.getElementById("app").innerHTML=`
             <div class="card">
@@ -365,22 +320,15 @@
                 <button onclick="adminCreatePaper()">新建试卷</button>
                 <button class="mt10" onclick="adminPaperList()">试卷管理</button>
                 <button class="mt10" onclick="adminBatchImport()">批量导入试题</button>
-                <button class="mt10" style="background:#e6551c" onclick="adminOcrPage()">📷 图片识别试题</button>
-                <button class="mt10" onclick="adminUserList()">用户管理</button>
-                <button class="mt10" onclick="adminCreateInvite()">生成邀请码</button>
+                <button class="mt10" onclick="adminPicPage()">📷 上传题目图片</button>
 
-                <!-- 同步按钮 -->
-                <button style="background:#009688" onclick="exportAllData()">💾 导出数据（电脑→手机）</button>
-                <label class="btn-outline mt10">
-                    <input type="file" hidden onchange="importAllData(event)">
-                    📂 导入数据（同步到本机）
-                </label>
+                <button style="background:#009688" onclick="exportAllData()">💾 导出数据</button>
+                <label class="btn-outline mt10"><input type="file" hidden onchange="importAllData(event)"> 📂 导入数据</label>
 
                 <button class="btn-outline mt10" onclick="renderHome()">退出</button>
             </div>`;
         }
 
-        // 新建试卷
         function adminCreatePaper(){
             let name=prompt("试卷名称：");if(!name)return;
             let sub=prompt("学科：math/chinese/english");
@@ -389,7 +337,6 @@
             saveData();alert("创建成功");adminPaperList();
         }
 
-        // 试卷列表
         function adminPaperList(){
             let html=`<div class="card"><div class="title">试卷列表</div>`;
             papers.forEach(p=>{
@@ -404,7 +351,6 @@
             document.getElementById("app").innerHTML=html;
         }
 
-        // 管理题目
         function adminManagePaper(pid){
             nowPaperId=pid;
             let p=papers.find(x=>x.id===pid);
@@ -421,12 +367,11 @@
             });
             html+=`<button onclick="adminAddQuestion()">单个添加</button>
                    <button class="mt10" onclick="adminBatchImportPaper(${pid})">批量导入</button>
-                   <button class="mt10" style="background:#e6551c" onclick="adminOcrToPaper(${pid})">图片识别加入</button>
+                   <button class="mt10" onclick="adminPicToPaper(${pid})">➕ 上传图片题目</button>
                    <button class="mt10" onclick="adminPaperList()">返回</button></div>`;
             document.getElementById("app").innerHTML=html;MathJax.typeset();
         }
 
-        // 添加题目
         function adminAddQuestion(){
             let type=prompt("1单选2多选3判断4填空");
             if(!QUESTION_TYPES[type])return;
@@ -434,19 +379,17 @@
             let opts=[];
             if(type==1||type==2){opts=[prompt("A："),prompt("B："),prompt("C："),prompt("D：")];}
             let ans=prompt("答案：");
-            let img=tempImage||"";
-            questions.push({id:Date.now(),paper_id:nowPaperId,subject:papers.find(x=>x.id===nowPaperId).subject,type:Number(type),content,options:opts,answer:ans,image:img});
+            questions.push({id:Date.now(),paper_id:nowPaperId,subject:papers.find(x=>x.id===nowPaperId).subject,type:Number(type),content,options:opts,answer:ans,image:tempImage||""});
             tempImage="";saveData();alert("添加成功");adminManagePaper(nowPaperId);
         }
 
-        // 删除题目
         function adminDelQuestion(id){
             if(!confirm("确定删除？"))return;
             questions=questions.filter(x=>x.id!==id);
             saveData();alert("已删除");adminManagePaper(nowPaperId);
         }
 
-        // 批量导入
+        // ===================== 批量导入 =====================
         function adminBatchImport(){
             document.getElementById("app").innerHTML=`
             <div class="card">
@@ -455,7 +398,6 @@
                 <select id="toP">${papers.map(p=>`<option value="${p.id}">${p.title}</option>`)}</select>
                 <textarea id="batchText"></textarea>
                 <button onclick="doBatch()">导入</button>
-                <button onclick="renderAdminMain()">返回</button>
             </div>`;
         }
         function adminBatchImportPaper(pid){
@@ -465,7 +407,6 @@
                 <div class="title">批量导入</div>
                 <textarea id="batchText"></textarea>
                 <button onclick="doBatchP()">导入</button>
-                <button onclick="adminManagePaper(${pid})">返回</button>
             </div>`;
         }
         function doBatch(){doBatchImport(document.getElementById("toP").value);}
@@ -483,136 +424,85 @@
             saveData();alert("导入完成");renderAdminMain();
         }
 
-        // ===================== 图片识别 =====================
-        function adminOcrPage(){
+        // ===================== 图片上传（已去掉OCR，不卡顿） =====================
+        function adminPicPage(){
             tempImage="";
             document.getElementById("app").innerHTML=`
             <div class="card">
-                <div class="title">📷 图片识别试题</div>
-                <div class="tip">上传题目图片 → 自动识别 → 编辑 → 加入试卷</div>
-                <input type="file" id="imgUpload" accept="image/*" onchange="previewImage(event)">
-                <img id="previewImg">
-                <button style="background:#009688" onclick="doOCR()">开始识别文字</button>
-                <button class="mt10" onclick="renderAdminMain()">返回</button>
+                <div class="title">上传题目图片</div>
+                <input type="file" accept="image/*" onchange="previewImg(event)">
+                <img id="previewImg" style="max-width:100%">
+                <button onclick="editPicQuestion()">下一步：编辑题目</button>
             </div>`;
         }
-        function previewImage(e){
-            let file=e.target.files[0];if(!file)return;
-            let reader=new FileReader();
-            reader.onload=function(ev){
-                tempImage=ev.target.result;
-                let img=document.getElementById("previewImg");
-                img.src=tempImage;img.style.display="block";
-            }
-            reader.readAsDataURL(file);
-        }
-        async function doOCR(){
-            if(!tempImage)return alert("请先上传图片");
-            alert("正在识别中...");
-            const { data: { text } } = await Tesseract.recognize(tempImage,'chi_sim+eng');
-            adminOcrEdit(tempImage,text);
-        }
-        function adminOcrToPaper(pid){
+
+        function adminPicToPaper(pid){
             nowPaperId=pid;tempImage="";
             document.getElementById("app").innerHTML=`
             <div class="card">
-                <div class="title">图片识别加入本试卷</div>
-                <input type="file" accept="image/*" onchange="previewImage(event)">
-                <img id="previewImg">
-                <button style="background:#009688" onclick="doOCRToPaper()">识别并编辑</button>
-                <button onclick="adminManagePaper(${pid})">返回</button>
+                <input type="file" accept="image/*" onchange="previewImg(event)">
+                <img id="previewImg" style="max-width:100%">
+                <button onclick="editPicToPaper()">下一步：编辑题目</button>
             </div>`;
         }
-        async function doOCRToPaper(){
-            if(!tempImage)return;
-            alert("识别中...");
-            const { data: { text } } = await Tesseract.recognize(tempImage,'chi_sim+eng');
-            adminOcrEditPaper(tempImage,text);
+
+        function previewImg(e){
+            let f = e.target.files[0];
+            let r = new FileReader();
+            r.onload = (ev)=>{
+                tempImage = ev.target.result;
+                document.getElementById("previewImg").src = tempImage;
+            };
+            r.readAsDataURL(f);
         }
-        function adminOcrEdit(img,text){
+
+        function editPicQuestion(){
+            if(!tempImage)return alert("请先上传图片");
             document.getElementById("app").innerHTML=`
             <div class="card">
-                <div class="title">编辑识别结果</div>
-                <img src="${img}" class="q-img">
-                <div class="tip">识别后的题目文字：</div>
-                <textarea id="ocrContent" style="min-height:120px">${text}</textarea>
-                <select id="ocrType">
+                <img src="${tempImage}" class="q-img">
+                <textarea id="qContent" placeholder="请输入题目文字"></textarea>
+                <select id="qType">
                     <option value="1">单选题</option>
                     <option value="2">多选题</option>
                     <option value="3">判断题</option>
                     <option value="4">填空题</option>
                 </select>
-                <input id="ocrAns" placeholder="输入正确答案">
-                <button style="background:#009688" onclick="saveOcrQuestion()">确认保存到试卷</button>
-                <button onclick="adminOcrPage()">取消</button>
+                <input id="qAns" placeholder="输入答案">
+                <button onclick="savePicQ()">保存题目</button>
             </div>`;
         }
-        function adminOcrEditPaper(img,text){
+
+        function editPicToPaper(){
+            if(!tempImage)return alert("请先上传图片");
             document.getElementById("app").innerHTML=`
             <div class="card">
-                <div class="title">编辑识别结果</div>
-                <img src="${img}" class="q-img">
-                <textarea id="ocrContent">${text}</textarea>
-                <select id="ocrType">
-                    <option value="1">单选题</option>
-                    <option value="2">多选题</option>
-                    <option value="3">判断题</option>
-                    <option value="4">填空题</option>
-                </select>
-                <input id="ocrAns" placeholder="答案">
-                <button onclick="saveOcrPaper()">确认加入试卷</button>
-                <button onclick="adminManagePaper(${nowPaperId})">取消</button>
+                <img src="${tempImage}" class="q-img">
+                <textarea id="qContent" placeholder="题目文字"></textarea>
+                <select id="qType"><option value="1">单选题</option><option value="2">多选题</option><option value="3">判断题</option><option value="4">填空题</option></select>
+                <input id="qAns" placeholder="答案">
+                <button onclick="savePicQPaper()">保存到试卷</button>
             </div>`;
         }
-        function saveOcrQuestion(){
-            let c=document.getElementById("ocrContent").value.trim();
-            let t=document.getElementById("ocrType").value;
-            let a=document.getElementById("ocrAns").value.trim();
+
+        function savePicQ(){
+            let c = document.getElementById("qContent").value;
+            let t = document.getElementById("qType").value;
+            let a = document.getElementById("qAns").value;
             if(!c||!a)return alert("不能为空");
-            let paperId=prompt("输入要加入的试卷ID：");
-            if(!papers.find(x=>x.id==paperId))return alert("试卷不存在");
-            let p=papers.find(x=>x.id==paperId);
-            questions.push({id:Date.now(),paper_id:paperId,subject:p.subject,type:Number(t),content:c,options:[],answer:a,image:tempImage});
-            tempImage="";saveData();alert("已保存！");renderAdminMain();
-        }
-        function saveOcrPaper(){
-            let c=document.getElementById("ocrContent").value.trim();
-            let t=document.getElementById("ocrType").value;
-            let a=document.getElementById("ocrAns").value.trim();
-            if(!c||!a)return alert("不能为空");
-            let p=papers.find(x=>x.id===nowPaperId);
-            questions.push({id:Date.now(),paper_id:nowPaperId,subject:p.subject,type:Number(t),content:c,options:[],answer:a,image:tempImage});
-            tempImage="";saveData();alert("已加入");adminManagePaper(nowPaperId);
+            let pid = prompt("输入试卷ID");
+            if(!papers.find(x=>x.id==pid))return alert("不存在");
+            questions.push({id:Date.now(),paper_id:pid,subject:papers.find(x=>x.id==pid).subject,type:Number(t),content:c,options:[],answer:a,image:tempImage});
+            tempImage="";saveData();alert("保存成功");renderAdminMain();
         }
 
-        // 用户管理
-        function adminUserList(){
-            let now=getNowDay();let html=`<div class="card"><div class="title">用户管理</div>`;
-            users.forEach(u=>{
-                let left=u.validDays-(now-u.regDay);
-                let end=dayToDate(u.regDay+u.validDays);
-                let st=u.disabled?"<span class='red'>禁用</span>":left>0?"<span class='green'>正常</span>":"<span class='red'>过期</span>";
-                html+=`<div class="item-box">
-                    <div>${u.name} ${u.grade}</div>
-                    <div>到期：${end} ${st}</div>
-                    <button onclick="adminAddDay('${u.username}')">续期</button>
-                    <button onclick="adminResetPwd('${u.username}')">改密</button>
-                    <button onclick="adminToggleDisable('${u.username}')">${u.disabled?'解禁':'禁用'}</button>
-                </div>`;
-            });
-            html+=`<button onclick="renderAdminMain()">返回</button></div>`;
-            document.getElementById("app").innerHTML=html;
-        }
-        function adminAddDay(uname){let d=prompt("天数：");if(d>0){users.find(x=>x.username===uname).validDays+=Number(d);saveData();alert("成功");}adminUserList();}
-        function adminResetPwd(uname){let p=prompt("新密码：");if(p){users.find(x=>x.username===uname).password=p;saveData();alert("成功");}adminUserList();}
-        function adminToggleDisable(uname){let u=users.find(x=>x.username===uname);u.disabled=!u.disabled;saveData();alert(u.disabled?"已禁用":"已解禁");adminUserList();}
-
-        // 邀请码
-        function adminCreateInvite(){
-            let code="INV"+Math.random().toString().slice(-6);
-            let day=prompt("有效天数：");
-            if(day>0){CODE_CONFIG[code]={type:"会员",days:Number(day)};alert("邀请码："+code);}
-            renderAdminMain();
+        function savePicQPaper(){
+            let c = document.getElementById("qContent").value;
+            let t = document.getElementById("qType").value;
+            let a = document.getElementById("qAns").value;
+            if(!c||!a)return alert("不能为空");
+            questions.push({id:Date.now(),paper_id:nowPaperId,subject:papers.find(x=>x.id===nowPaperId).subject,type:Number(t),content:c,options:[],answer:a,image:tempImage});
+            tempImage="";saveData();alert("保存成功");adminManagePaper(nowPaperId);
         }
 
         renderHome();
