@@ -6,32 +6,178 @@
     <title>大湾区全科智能刷题系统</title>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml.js"></script>
     <style>
-        *{margin:0;padding:0;box-sizing:border-box;font-family:"Microsoft YaHei",sans-serif}
-        body{background:linear-gradient(135deg,#f8f9fc 0%,#eef2f8 100%);min-height:100vh;padding:15px}
-        .container{max-width:520px;margin:auto}
-        .card{background:#fff;border-radius:20px;padding:24px;margin:12px 0;box-shadow:0 8px 24px rgba(0,30,80,0.06)}
-        .title{font-size:22px;font-weight:700;color:#2c3e50;text-align:center;margin-bottom:20px}
-        .btn{width:100%;padding:15px;border:none;border-radius:14px;font-size:16px;margin:8px 0;background:#4361ee;color:#fff;cursor:pointer}
-        .btn-success{background:#06b96f}
-        .btn-danger{background:#ef4444}
-        .btn-light{background:#f1f5f9;color:#4361ee}
-        .input{width:100%;padding:14px 16px;border:1px solid #e2e8f0;border-radius:14px;margin:8px 0;font-size:15px}
+        *{margin:0;padding:0;box-sizing:border-box;font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+        body{
+            background:linear-gradient(135deg,#f0f7ff 0%,#e6f4ff 100%);
+            min-height:100vh;
+            padding:15px;
+            position:relative;
+        }
+
+        /* 大湾区全科 水印 */
+        body::after{
+            content:"大湾区全科";
+            position:fixed;
+            top:50%;
+            left:50%;
+            transform:translate(-50%,-50%);
+            font-size:40px;
+            color:rgba(66, 135, 245, 0.08);
+            z-index:1;
+            pointer-events:none;
+            white-space:nowrap;
+            font-weight:bold;
+        }
+
+        .container{
+            max-width:540px;
+            margin:auto;
+            position:relative;
+            z-index:2;
+        }
+        .card{
+            background:#ffffff;
+            border-radius:22px;
+            padding:26px;
+            margin:14px 0;
+            box-shadow:0 10px 30px rgba(60, 120, 220, 0.07);
+            border:1px solid rgba(255,255,255,0.6);
+            backdrop-filter:blur(10px);
+        }
+        .title{
+            font-size:23px;
+            font-weight:700;
+            color:#2a5896;
+            text-align:center;
+            margin-bottom:22px;
+        }
+        .btn{
+            width:100%;
+            padding:16px;
+            border:none;
+            border-radius:16px;
+            font-size:16px;
+            font-weight:500;
+            margin:9px 0;
+            background:#4287f5;
+            color:#fff;
+            cursor:pointer;
+            transition:0.2s;
+        }
+        .btn:hover{opacity:0.92}
+        .btn-success{background:#21b97a}
+        .btn-danger{background:#f44362}
+        .btn-light{background:#f2f7ff;color:#4287f5}
+        .input{
+            width:100%;
+            padding:15px 18px;
+            border:1px solid #e0ecff;
+            border-radius:16px;
+            margin:9px 0;
+            font-size:15px;
+            background:#fafcff;
+            transition:0.2s;
+        }
+        .input:focus{
+            outline:none;
+            border-color:#4287f5;
+            background:#fff;
+        }
         .text-center{text-align:center}
-        .tip{font-size:12px;color:#9ca3af;margin-top:8px}
-        .price-item{padding:12px 16px;background:#f9fafb;border-radius:12px;margin:6px 0}
-        .qrcode{width:180px;margin:15px auto;border-radius:14px;display:block}
-        .math-bar{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
-        .math-btn{padding:8px 10px;background:#e0e7ff;border:none;border-radius:8px;color:#4361ee}
-        .tab{display:flex;gap:6px;margin-bottom:12px}
-        .tab button{flex:1;padding:11px;border-radius:10px;border:none;background:#f1f5f9}
-        .tab button.active{background:#4361ee;color:#fff}
+        .tip{font-size:12px;color:#8aa2c4;margin-top:8px;text-align:center}
+        .price-item{
+            padding:14px;
+            background:#f7fbff;
+            border-radius:14px;
+            margin:8px 0;
+            font-size:15px;
+            color:#2a5896;
+            font-weight:500;
+        }
+        .qrcode{
+            width:190px;
+            margin:18px auto;
+            border-radius:18px;
+            display:block;
+        }
+        .math-bar{
+            display:flex;
+            flex-wrap:wrap;
+            gap:8px;
+            margin:12px 0;
+        }
+        .math-btn{
+            padding:9px 11px;
+            background:#eaf4ff;
+            border:none;
+            border-radius:10px;
+            color:#4287f5;
+            font-weight:500;
+        }
+        .tab{
+            display:flex;
+            gap:8px;
+            margin-bottom:15px;
+        }
+        .tab button{
+            flex:1;
+            padding:13px;
+            border-radius:12px;
+            border:none;
+            background:#f2f7ff;
+            font-weight:500;
+            color:#666;
+        }
+        .tab button.active{
+            background:#4287f5;
+            color:#fff;
+        }
         .hide{display:none}
-        .q-item{padding:14px 0;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center}
-        .q-btns{display:flex;gap:6px}
-        .q-btns button{padding:6px 10px;border-radius:8px;border:none}
-        .item-del{background:#fee2e2;color:#ef4444}
-        .item-edit{background:#dbeafe;color:#3b82f6}
-        label{cursor:pointer;display:block;margin:6px 0;font-size:15px}
+        .q-item{
+            padding:16px 0;
+            border-bottom:1px solid #f0f7ff;
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+        }
+        .q-btns{display:flex;gap:8px}
+        .q-btns button{
+            padding:7px 11px;
+            border-radius:10px;
+            border:none;
+            font-size:12px;
+        }
+        .item-del{background:#ffeef2;color:#f44362}
+        .item-edit{background:#eaf4ff;color:#4287f5}
+        label{
+            cursor:pointer;
+            display:block;
+            margin:8px 0;
+            font-size:15px;
+            color:#333;
+        }
+        .user-item{
+            padding:16px;
+            border-bottom:1px solid #f0f7ff;
+            font-size:14px;
+            border-radius:12px;
+            margin-bottom:8px;
+            background:#fafbfd;
+        }
+        .user-tag{
+            display:inline-block;
+            padding:4px 8px;
+            border-radius:8px;
+            font-size:12px;
+            color:#fff;
+            margin-left:6px;
+            font-weight:bold;
+        }
+        .tag-test{background:#94a3b8}
+        .tag-month{background:#4287f5}
+        .tag-season{background:#8b5cf6}
+        .tag-year{background:#21b97a}
+        .tag-vip{background:#f59e0b}
     </style>
 </head>
 <body>
@@ -40,7 +186,15 @@
 const ADMIN_PASS = "awedsr134793";
 const WECHAT_ID = "475589411";
 const PAY_QR_URL = "pay.png";
-const CODE_CONFIG = { "YZW2026": { days: 99999 } };
+
+// —————— 你要的邀请码已修改 ——————
+const CODE_CONFIG = {
+    "tiyan2026":  {name:"体验会员", days:1},
+    "yue2026":    {name:"月会员",   days:30},
+    "ji2026":     {name:"季会员",   days:90},
+    "nian2026":   {name:"年会员",   days:365},
+    "VIP999":     {name:"永久会员", days:99999}
+};
 
 let users = JSON.parse(localStorage.getItem("users")) || [];
 let papers = JSON.parse(localStorage.getItem("papers")) || [];
@@ -79,7 +233,7 @@ function getDay(){return Math.floor(Date.now()/86400000);}
 function home(){
     app.innerHTML=`
     <div class="card">
-        <div class="title">全科智能刷题系统</div>
+        <div class="title">大湾区全科刷题系统</div>
         <button class="btn" onclick="login()">学生登录</button>
         <button class="btn" onclick="reg()">注册账号</button>
         <button class="btn btn-light" onclick="adminLogin()">教师后台</button>
@@ -99,8 +253,18 @@ function login(){
     </div>`;
 }
 function loginGo(){
-    let user = users.find(x=>x.username==document.getElementById("u").value && x.password==document.getElementById("p").value);
+    let u = document.getElementById("u").value;
+    let p = document.getElementById("p").value;
+    let user = users.find(x=>x.username==u&&x.password==p);
     if(!user)return alert("账号或密码错误");
+    
+    let now = getDay();
+    let expire = user.regDay + user.validDays;
+    if(now > expire){
+        alert("会员已过期，请联系管理员续费");
+        return;
+    }
+    
     currentUser = user;
     student();
 }
@@ -109,7 +273,7 @@ function loginGo(){
 function reg(){
     app.innerHTML=`
     <div class="card">
-        <div class="title">注册</div>
+        <div class="title">注册账号</div>
         <input class="input" id="ru" placeholder="账号">
         <input class="input" id="rp" type="password" placeholder="密码">
         <input class="input" id="rn" placeholder="姓名">
@@ -119,11 +283,24 @@ function reg(){
     </div>`;
 }
 function regGo(){
-    let u=document.getElementById("ru").value,p=document.getElementById("rp").value,n=document.getElementById("rn").value,c=document.getElementById("rc").value;
+    let u=document.getElementById("ru").value;
+    let p=document.getElementById("rp").value;
+    let n=document.getElementById("rn").value;
+    let c=document.getElementById("rc").value;
+    
     if(!u||!p||!n||!c)return alert("请完整填写");
     if(!CODE_CONFIG[c])return alert("邀请码无效");
-    users.push({username:u,password:p,name:n,regDay:getDay(),validDays:CODE_CONFIG[c].days});
-    saveAll();alert("注册成功！");login();
+    
+    let days = CODE_CONFIG[c].days;
+    let type = CODE_CONFIG[c].name;
+    
+    users.push({
+        username:u, password:p, name:n,
+        regDay:getDay(), validDays:days, vipType:type
+    });
+    saveAll();
+    alert("注册成功！\n套餐："+type);
+    login();
 }
 
 // ========== 付费 ==========
@@ -133,11 +310,11 @@ function pay(){
         <div class="title">会员开通</div>
         <div class="price-item">✅ 体验会员 —— 9.9 元</div>
         <div class="price-item">✅ 月会员 —— 38 元</div>
-        <div class="price-item">✅ 季度会员 —— 68 元</div>
-        <div class="price-item">✅ 年度会员 —— 128 元</div>
+        <div class="price-item">✅ 季会员 —— 68 元</div>
+        <div class="price-item">✅ 年会员 —— 128 元</div>
         <div class="price-item">✅ 永久会员 —— 199 元</div>
         <img src="${PAY_QR_URL}" class="qrcode">
-        <div class="text-center">微信：${WECHAT_ID}</div>
+        <div class="text-center" style="font-weight:bold;color:#4287f5">微信：${WECHAT_ID}</div>
         <button class="btn btn-light" onclick="home()">返回</button>
     </div>`;
 }
@@ -162,7 +339,7 @@ function examList(sub){
     app.innerHTML=h;
 }
 
-// ========== 修复：选择题正常勾选 + 提交判分 ==========
+// ========== 考试答题 ==========
 function startExam(pid){
     let qs = questions.filter(x=>x.pid==pid);
     let h=`<div class="card"><div class="title">开始答题</div>`;
@@ -170,7 +347,6 @@ function startExam(pid){
     qs.forEach((q,i)=>{
         h+=`<div style="margin:18px 0"><b>${i+1}.</b> <span class="mj-parse">${q.content}</span></div>`;
         
-        // 单选题（修复可勾选）
         if(q.type==1){
             h+=`
             <label><input type="radio" name="q_${i}" value="A"> A. ${q.op[0]}</label>
@@ -179,16 +355,12 @@ function startExam(pid){
             <label><input type="radio" name="q_${i}" value="D"> D. ${q.op[3]}</label>
             `;
         }
-
-        // 判断题
         if(q.type==3){
             h+=`
             <label><input type="radio" name="q_${i}" value="对"> 对</label>
             <label><input type="radio" name="q_${i}" value="错"> 错</label>
             `;
         }
-
-        // 填空题
         if(q.type==4){
             h+=`<input class="input" id="q_${i}" placeholder="输入答案">`;
         }
@@ -225,7 +397,7 @@ function submitExam(pid){
 }
 
 function showWrong(){
-    let list = wrongBooks.filter(x=>x.pid==nowPaperId);
+    let list = wrongBooks;
     let h=`<div class="card"><div class="title">错题本</div>`;
     list.forEach(q=>{h+=`<div style="padding:10px 0;border-bottom:1px solid #eee"><span class="mj-parse">${q.content}</span></div>`;});
     h+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
@@ -236,8 +408,8 @@ function showWrong(){
 function adminLogin(){
     app.innerHTML=`
     <div class="card">
-        <div class="title">教师登录</div>
-        <input class="input" id="pwd" type="password" placeholder="密码">
+        <div class="title">教师后台</div>
+        <input class="input" id="pwd" type="password" placeholder="请输入管理员密码">
         <button class="btn" onclick="if(document.getElementById('pwd').value==ADMIN_PASS)admin()">登录</button>
     </div>`;
 }
@@ -249,21 +421,21 @@ function admin(){
         <button class="btn" onclick="paperList()">管理题目</button>
         <button class="btn" onclick="batchImport()">批量导入</button>
         <button class="btn" onclick="picQuestion()">图片题目</button>
-        <button class="btn" onclick="userList()">用户管理</button>
+        <button class="btn" onclick="userList()">👤 用户管理</button>
         <button class="btn" onclick="createInvite()">生成邀请码</button>
         <button class="btn btn-light" onclick="home()">退出</button>
     </div>`;
 }
 
-// ========== 试卷 ==========
+// ========== 试卷管理 ==========
 function addPaper(){
-    let title=prompt("试卷名称");
+    let title=prompt("请输入试卷名称");
     if(!title)return;
     papers.push({id:Date.now(),title:title,sub:"math"});
     saveAll();paperList();
 }
 function paperList(){
-    let h=`<div class="card"><div class="title">试卷</div>`;
+    let h=`<div class="card"><div class="title">试卷管理</div>`;
     papers.forEach(p=>{h+=`<button class="btn" onclick="goPaper(${p.id})">${p.title}</button>`;});
     h+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;
     app.innerHTML=h;
@@ -284,26 +456,26 @@ function goPaper(pid){
 
         <div id="m1">
             ${mathBar("c1")}
-            <textarea class="input" id="c1" placeholder="题目"></textarea>
-            <input class="input" id="a1" placeholder="A">
-            <input class="input" id="b1" placeholder="B">
-            <input class="input" id="c1i" placeholder="C">
-            <input class="input" id="d1" placeholder="D">
+            <textarea class="input" id="c1" placeholder="请输入题目"></textarea>
+            <input class="input" id="a1" placeholder="选项 A">
+            <input class="input" id="b1" placeholder="选项 B">
+            <input class="input" id="c1i" placeholder="选项 C">
+            <input class="input" id="d1" placeholder="选项 D">
             <input class="input" id="ans1" placeholder="答案(A/B/C/D)">
         </div>
         <div id="m3" class="hide">
             ${mathBar("c3")}
-            <textarea class="input" id="c3" placeholder="题目"></textarea>
-            <input class="input" id="ans3" placeholder="对/错">
+            <textarea class="input" id="c3" placeholder="请输入题目"></textarea>
+            <input class="input" id="ans3" placeholder="答案(对/错)">
         </div>
         <div id="m4" class="hide">
             ${mathBar("c4")}
-            <textarea class="input" id="c4" placeholder="题目"></textarea>
+            <textarea class="input" id="c4" placeholder="请输入题目"></textarea>
             <input class="input" id="ans4" placeholder="答案">
         </div>
 
         <button class="btn btn-success" onclick="saveQ()">保存题目</button>
-        <div style="margin:20px 0"><b>已有题目：</b></div>`;
+        <div style="margin:20px 0;font-weight:bold;color:#4287f5">已有题目：</div>`;
 
     qs.forEach(q=>{
         h+=`
@@ -347,17 +519,63 @@ function editQ(id){editingQid=id;let q=questions.find(x=>x.id==id);
     if(q.type==3){tab(3);document.getElementById("c3").value=q.content;document.getElementById("ans3").value=q.answer;}
     if(q.type==4){tab(4);document.getElementById("c4").value=q.content;document.getElementById("ans4").value=q.answer;}
 }
-function delQ(id){if(!confirm("确定删除？"))return;questions=questions.filter(x=>x.id!=id);saveAll();goPaper(nowPaperId);}
+function delQ(id){if(!confirm("确定删除该题目？"))return;questions=questions.filter(x=>x.id!=id);saveAll();goPaper(nowPaperId);}
+
+// ========== 用户管理 ==========
+function userList(){
+    let h = `<div class="card"><div class="title">用户管理</div>`;
+    users.forEach((u, index)=>{
+        let now = getDay();
+        let expireDay = u.regDay + u.validDays;
+        let left = expireDay - now;
+        let status = left > 0 ? `剩余 ${left} 天` : "已过期";
+        
+        let tagClass = "";
+        if(u.vipType.includes("体验")) tagClass = "user-tag tag-test";
+        if(u.vipType.includes("月")) tagClass = "user-tag tag-month";
+        if(u.vipType.includes("季")) tagClass = "user-tag tag-season";
+        if(u.vipType.includes("年")) tagClass = "user-tag tag-year";
+        if(u.vipType.includes("永久")) tagClass = "user-tag tag-vip";
+
+        h += `
+        <div class="user-item">
+            ${u.name} (${u.username})
+            <span class="${tagClass}">${u.vipType}</span>
+            <div style="font-size:12px;color:#666;margin-top:5px">状态：${status}</div>
+            <button class="btn-danger" style="width:auto;padding:6px 10px;font-size:12px;margin-top:8px" onclick="delUser(${index})">删除用户</button>
+        </div>`;
+    });
+    h += `<button class="btn btn-light" onclick="admin()">返回</button></div>`;
+    app.innerHTML = h;
+}
+function delUser(index){
+    if(!confirm("确定删除该用户？")) return;
+    users.splice(index, 1);
+    saveAll();
+    userList();
+}
+
+// ========== 邀请码 ==========
+function createInvite(){
+    let list = [
+        {k:"tiyan2026",v:"体验会员"},
+        {k:"yue2026",v:"月会员"},
+        {k:"ji2026",v:"季会员"},
+        {k:"nian2026",v:"年会员"},
+        {k:"VIP999",v:"永久会员"}
+    ];
+    let str = "";
+    list.forEach(x=>{ str += x.k + " —— " + x.v + "\n"; });
+    alert("可用邀请码：\n\n"+str);
+}
 
 // ========== 完整功能 ==========
 function batchImport(){app.innerHTML=`<div class="card"><div class="title">批量导入</div><div class="tip">格式：题目|A|B|C|D|答案</div><textarea class="input" rows="8" id="batch"></textarea><button class="btn" onclick="batchGo()">导入</button></div>`;}
 function batchGo(){document.getElementById("batch").value.split("\n").forEach(line=>{let a=line.split("|");questions.push({id:Date.now(),pid:nowPaperId,type:1,content:a[0],op:[a[1],a[2],a[3],a[4]],answer:a[5]});});saveAll();alert("导入成功");admin();}
 function picQuestion(){tempImage="";app.innerHTML=`<div class="card"><div class="title">图片题目</div><input type="file" accept="image/*" onchange="preImg(event)"><button class="btn" onclick="editPic()">下一步</button></div>`;}
 function preImg(e){let f=new FileReader();f.onload=e=>tempImage=e.target.result;f.readAsDataURL(e.target.files[0]);}
-function editPic(){app.innerHTML=`<div class="card"><div class="title">编辑</div>${mathBar("pc")}<textarea class="input" id="pc"></textarea><input class="input" id="pa" placeholder="答案"><button class="btn" onclick="savePic()">保存</button></div>`;}
+function editPic(){app.innerHTML=`<div class="card"><div class="title">编辑图片题目</div>${mathBar("pc")}<textarea class="input" id="pc"></textarea><input class="input" id="pa" placeholder="答案"><button class="btn" onclick="savePic()">保存</button></div>`;}
 function savePic(){questions.push({id:Date.now(),pid:nowPaperId,type:1,content:document.getElementById("pc").value,img:tempImage,answer:document.getElementById("pa").value});saveAll();admin();}
-function userList(){let h=`<div class="card"><div class="title">用户列表</div>`;users.forEach(u=>{h+=`<div style="padding:10px;border-bottom:1px solid #eee">${u.username}（${u.name}）</div>`;});h+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;app.innerHTML=h;}
-function createInvite(){let code="VIP"+Math.random().toString().slice(-6);CODE_CONFIG[code]={days:365};alert("邀请码："+code);admin();}
 
 home();
 </script>
