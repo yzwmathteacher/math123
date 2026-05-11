@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>大湾区全科智能刷题系统</title>
-    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <style>
         *{box-sizing:border-box}
         body{background:#f5f7fa;margin:0;padding:15px;font-family:Arial,"微软雅黑"}
@@ -19,7 +19,7 @@
         .text-center{text-align:center}
         .mt10{margin-top:10px}
         .red{color:red}
-        .green{color:green}
+        .green{color:#009688}
         .blue{color:#2c52ed}
         .tip{font-size:12px;color:#666;margin-top:5px}
         .tag{display:inline-block;padding:3px 8px;border-radius:4px;font-size:12px;color:#fff;margin:2px}
@@ -31,6 +31,8 @@
         .mj-parse{display:inline}
         .q-img{max-width:100%;max-height:220px;border-radius:8px;margin:8px 0;display:block}
         #previewImg{max-width:100%;max-height:250px;border-radius:10px;margin:10px 0;display:none}
+        .math-btns{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0;}
+        .math-btn{padding:6px 10px;background:#f0f4ff;border:none;border-radius:6px;font-size:14px;color:#2c52ed;cursor:pointer}
     </style>
 </head>
 <body>
@@ -39,6 +41,7 @@
     <script>
         const ADMIN_PASS = "awedsr134793";
         const WECHAT_ID = "475589411";
+        const PAY_QR_URL = "https://pic.qqpay.com/qr/wechat.png";
         const SYS_NOTICE = "欢迎使用大湾区全科智能刷题系统！\n付费请联系管理员微信，切勿私下转账。";
         const CODE_CONFIG = {
             "YZW2026":{type:"内部永久会员",days:99999}
@@ -58,6 +61,45 @@
         let currentUser = null;
         let nowPaperId = 0;
         let tempImage = "";
+
+        // ===================== 公式快捷插入工具 =====================
+        const MATH_TOOLS = [
+            {name:"+",val:"+"},
+            {name:"-",val:"-"},
+            {name:"×",val:"\\times"},
+            {name:"÷",val:"\\div"},
+            {name:"=",val:"="},
+            {name:"≠",val:"\\neq"},
+            {name:"<",val:"<"},
+            {name:">",val:">"},
+            {name:"≤",val:"\\leq"},
+            {name:"≥",val:"\\geq"},
+            {name:"1/2",val:"\\frac{1}{2}"},
+            {name:"平方",val:"^2"},
+            {name:"立方",val:"^3"},
+            {name:"根号",val:"\\sqrt{}"},
+            {name:"%",val:"\\%"},
+            {name:"℃",val:"^\\circ C"},
+            {name:"角度",val:"^\\circ"},
+            {name:"π",val:"\\pi"},
+        ];
+
+        function insertToTextarea(id, val){
+            let el = document.getElementById(id);
+            let pos = el.selectionStart;
+            let v = el.value;
+            el.value = v.slice(0, pos) + val + v.slice(pos);
+            el.focus();
+        }
+
+        function renderMathTools(targetId){
+            let html = `<div class="math-btns">`;
+            MATH_TOOLS.forEach(m=>{
+                html+=`<button type="button" class="math-btn" onclick="insertToTextarea('${targetId}','${m.val}')">${m.name}</button>`;
+            });
+            html+=`</div>`;
+            return html;
+        }
 
         // ===================== 导出 / 导入 同步 =====================
         function exportAllData() {
@@ -320,7 +362,7 @@
         }
         function clearMyWrong(){if(!confirm("确定清空？"))return;wrongBooks=wrongBooks.filter(w=>w.username!==currentUser.username);saveData();alert("已清空");renderWrongBook();}
 
-        // ===================== 付款页面 =====================
+        // ===================== 付款页面（带付款码） =====================
         function renderPay(){
             document.getElementById("app").innerHTML=`
             <div class="card">
@@ -332,6 +374,7 @@
                 <div>✅ 永久会员 —— 199元</div>
                 </div>
                 <div style="height:1px;background:#eee;margin:15px 0;"></div>
+                <img src="${PAY_QR_URL}" style="width:180px;display:block;margin:10px auto;border-radius:10px">
                 <div class="text-center" style="font-size:17px; font-weight:bold;">
                     微信：${WECHAT_ID}
                 </div>
@@ -420,16 +463,56 @@
             document.getElementById("app").innerHTML=html;MathJax.typeset();
         }
 
-        // ===================== 题目管理 =====================
+        // ===================== 【老师专用：带公式工具的出题器】 =====================
         function adminAddQuestion(){
-            let type=prompt("1单选2多选3判断4填空");
-            if(!QUESTION_TYPES[type])return;
-            let content=prompt("题目：");
-            let opts=[];
-            if(type==1||type==2){opts=[prompt("A："),prompt("B："),prompt("C："),prompt("D：")];}
-            let ans=prompt("答案：");
-            questions.push({id:Date.now(),paper_id:nowPaperId,subject:papers.find(x=>x.id===nowPaperId).subject,type:Number(type),content,options:opts,answer:ans,image:tempImage||""});
-            tempImage="";saveData();alert("添加成功");adminManagePaper(nowPaperId);
+            document.getElementById("app").innerHTML = `
+            <div class="card">
+                <div class="title">添加题目（老师专用）</div>
+                <select id="qType">
+                    <option value="1">单选题</option>
+                    <option value="2">多选题</option>
+                    <option value="3">判断题</option>
+                    <option value="4">填空题</option>
+                </select>
+                <div>题目内容：</div>
+                ${renderMathTools("qContent")}
+                <textarea id="qContent" placeholder="输入题目，点上方快捷插入公式"></textarea>
+                <input id="optA" placeholder="选项A（单选/多选填写）">
+                <input id="optB" placeholder="选项B">
+                <input id="optC" placeholder="选项C">
+                <input id="optD" placeholder="选项D">
+                <input id="qAns" placeholder="正确答案">
+                <button onclick="saveAdminQuestion()">保存题目</button>
+                <button class="mt10" onclick="adminManagePaper(${nowPaperId})">返回</button>
+            </div>`;
+        }
+
+        function saveAdminQuestion(){
+            let type = document.getElementById("qType").value;
+            let content = document.getElementById("qContent").value;
+            let A = document.getElementById("optA").value;
+            let B = document.getElementById("optB").value;
+            let C = document.getElementById("optC").value;
+            let D = document.getElementById("optD").value;
+            let ans = document.getElementById("qAns").value;
+            if(!content || !ans) return alert("题目和答案不能为空！");
+            
+            let p = papers.find(x=>x.id===nowPaperId);
+            let opts = [A,B,C,D];
+            questions.push({
+                id:Date.now(),
+                paper_id:nowPaperId,
+                subject:p.subject,
+                type:Number(type),
+                content:content,
+                options:opts,
+                answer:ans,
+                image:tempImage||""
+            });
+            tempImage = "";
+            saveData();
+            alert("✅ 题目保存成功！");
+            adminManagePaper(nowPaperId);
         }
 
         function adminDelQuestion(id){
@@ -473,7 +556,7 @@
             saveData();alert("导入完成");renderAdminMain();
         }
 
-        // ===================== 图片上传（不卡顿） =====================
+        // ===================== 图片上传 =====================
         function adminPicPage(){
             tempImage="";
             document.getElementById("app").innerHTML=`
@@ -507,7 +590,8 @@
             document.getElementById("app").innerHTML=`
             <div class="card">
                 <img src="${tempImage}" class="q-img">
-                <textarea id="qContent" placeholder="请输入题目文字"></textarea>
+                ${renderMathTools("qContent")}
+                <textarea id="qContent" placeholder="输入题目文字"></textarea>
                 <select id="qType">
                     <option value="1">单选题</option>
                     <option value="2">多选题</option>
@@ -523,6 +607,7 @@
             document.getElementById("app").innerHTML=`
             <div class="card">
                 <img src="${tempImage}" class="q-img">
+                ${renderMathTools("qContent")}
                 <textarea id="qContent" placeholder="题目文字"></textarea>
                 <select id="qType"><option value="1">单选题</option><option value="2">多选题</option><option value="3">判断题</option><option value="4">填空题</option></select>
                 <input id="qAns" placeholder="答案">
