@@ -3,197 +3,197 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>大湾区全科智能刷题系统</title>
+    <title>大湾区全科 - 中小学智能刷题平台</title>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml.js"></script>
     <style>
         *{margin:0;padding:0;box-sizing:border-box;font-family:"PingFang SC","Microsoft YaHei",sans-serif}
         body{
-            background:linear-gradient(135deg,#f0f7ff 0%,#e6f4ff 100%);
+            background:linear-gradient(135deg,#e6f7ff 0%,#f0f9ff 100%);
             min-height:100vh;
             padding:15px;
             position:relative;
         }
-
-        /* 大湾区全科 水印 */
         body::after{
             content:"大湾区全科";
             position:fixed;
-            top:50%;
-            left:50%;
+            top:50%;left:50%;
             transform:translate(-50%,-50%);
-            font-size:40px;
-            color:rgba(66, 135, 245, 0.08);
+            font-size:48px;
+            font-weight:bold;
+            color:rgba(50,130,240,0.07);
             z-index:1;
             pointer-events:none;
             white-space:nowrap;
-            font-weight:bold;
         }
-
         .container{
-            max-width:540px;
+            max-width:560px;
             margin:auto;
             position:relative;
             z-index:2;
         }
         .card{
-            background:#ffffff;
-            border-radius:22px;
+            background:#fff;
+            border-radius:24px;
             padding:26px;
             margin:14px 0;
-            box-shadow:0 10px 30px rgba(60, 120, 220, 0.07);
-            border:1px solid rgba(255,255,255,0.6);
-            backdrop-filter:blur(10px);
+            box-shadow:0 12px 32px rgba(60,120,240,0.08);
+            border:1px solid rgba(255,255,255,0.7);
         }
         .title{
-            font-size:23px;
+            font-size:24px;
             font-weight:700;
-            color:#2a5896;
+            color:#1d5bc0;
             text-align:center;
             margin-bottom:22px;
         }
+        .sub-title{
+            font-size:14px;
+            color:#666;
+            text-align:center;
+            margin-bottom:20px;
+        }
         .btn{
             width:100%;
-            padding:16px;
+            padding:17px;
             border:none;
-            border-radius:16px;
+            border-radius:18px;
             font-size:16px;
             font-weight:500;
-            margin:9px 0;
-            background:#4287f5;
+            margin:10px 0;
+            background:#3282f0;
             color:#fff;
             cursor:pointer;
             transition:0.2s;
         }
-        .btn:hover{opacity:0.92}
-        .btn-success{background:#21b97a}
-        .btn-danger{background:#f44362}
-        .btn-light{background:#f2f7ff;color:#4287f5}
+        .btn:hover{opacity:0.93}
+        .btn-success{background:#22c580}
+        .btn-warning{background:#f59e0b}
+        .btn-danger{background:#f43f5e}
+        .btn-light{background:#eff6ff;color:#3282f0}
         .input{
             width:100%;
-            padding:15px 18px;
-            border:1px solid #e0ecff;
-            border-radius:16px;
-            margin:9px 0;
+            padding:16px 18px;
+            border:1px solid #d1e5ff;
+            border-radius:18px;
+            margin:10px 0;
             font-size:15px;
-            background:#fafcff;
+            background:#fafbff;
             transition:0.2s;
         }
         .input:focus{
             outline:none;
-            border-color:#4287f5;
+            border-color:#3282f0;
             background:#fff;
         }
-        .text-center{text-align:center}
-        .tip{font-size:12px;color:#8aa2c4;margin-top:8px;text-align:center}
-        .price-item{
-            padding:14px;
-            background:#f7fbff;
-            border-radius:14px;
-            margin:8px 0;
-            font-size:15px;
-            color:#2a5896;
-            font-weight:500;
-        }
-        .qrcode{
-            width:190px;
-            margin:18px auto;
-            border-radius:18px;
-            display:block;
-        }
-        .math-bar{
-            display:flex;
-            flex-wrap:wrap;
-            gap:8px;
-            margin:12px 0;
-        }
-        .math-btn{
-            padding:9px 11px;
-            background:#eaf4ff;
-            border:none;
-            border-radius:10px;
-            color:#4287f5;
-            font-weight:500;
-        }
-        .tab{
-            display:flex;
-            gap:8px;
-            margin-bottom:15px;
-        }
-        .tab button{
-            flex:1;
-            padding:13px;
+        .tag{
+            display:inline-block;
+            padding:5px 10px;
             border-radius:12px;
-            border:none;
-            background:#f2f7ff;
-            font-weight:500;
-            color:#666;
-        }
-        .tab button.active{
-            background:#4287f5;
+            font-size:12px;
+            font-weight:bold;
             color:#fff;
+            margin-right:6px;
         }
-        .hide{display:none}
+        .tag-test{background:#94a3b8}
+        .tag-month{background:#3282f0}
+        .tag-season{background:#8b5cf6}
+        .tag-year{background:#22c580}
+        .tag-vip{background:#f59e0b}
+        .subject-grid{
+            display:grid;
+            grid-template-columns:1fr 1fr 1fr;
+            gap:12px;
+            margin:20px 0;
+        }
+        .subject-item{
+            background:#eff6ff;
+            border-radius:18px;
+            padding:20px 10px;
+            text-align:center;
+            cursor:pointer;
+        }
+        .stat-box{
+            background:#f7fbff;
+            border-radius:16px;
+            padding:18px;
+            margin:12px 0;
+            text-align:center;
+        }
+        .stat-row{
+            display:flex;
+            justify-content:space-between;
+            margin:10px 0;
+        }
+        .user-item{
+            background:#f8fafc;
+            border-radius:16px;
+            padding:18px;
+            margin-bottom:10px;
+        }
         .q-item{
-            padding:16px 0;
+            padding:18px 0;
             border-bottom:1px solid #f0f7ff;
             display:flex;
             justify-content:space-between;
             align-items:center;
         }
-        .q-btns{display:flex;gap:8px}
+        .q-btns{display:flex;gap:10px}
         .q-btns button{
-            padding:7px 11px;
+            padding:8px 12px;
             border-radius:10px;
             border:none;
             font-size:12px;
         }
-        .item-del{background:#ffeef2;color:#f44362}
-        .item-edit{background:#eaf4ff;color:#4287f5}
+        .item-edit{background:#dbeafe;color:#3282f0}
+        .item-del{background:#fee2e2;color:#f43f5e}
         label{
+            display:block;margin:10px 0;
+            font-size:15px;color:#333;
             cursor:pointer;
-            display:block;
-            margin:8px 0;
-            font-size:15px;
-            color:#333;
         }
-        .user-item{
-            padding:16px;
-            border-bottom:1px solid #f0f7ff;
-            font-size:14px;
-            border-radius:12px;
-            margin-bottom:8px;
-            background:#fafbfd;
+        .math-bar{
+            display:flex;flex-wrap:wrap;gap:8px;
+            margin:12px 0;
         }
-        .user-tag{
-            display:inline-block;
-            padding:4px 8px;
-            border-radius:8px;
-            font-size:12px;
+        .math-btn{
+            padding:10px 12px;
+            background:#e0eaff;
+            border:none;
+            border-radius:10px;
+            color:#3282f0;
+        }
+        .tab{
+            display:flex;gap:10px;
+            margin-bottom:16px;
+        }
+        .tab button{
+            flex:1;
+            padding:14px;
+            border-radius:14px;
+            border:none;
+            background:#f0f7ff;
+            font-weight:500;
+        }
+        .tab button.active{
+            background:#3282f0;
             color:#fff;
-            margin-left:6px;
-            font-weight:bold;
         }
-        .tag-test{background:#94a3b8}
-        .tag-month{background:#4287f5}
-        .tag-season{background:#8b5cf6}
-        .tag-year{background:#21b97a}
-        .tag-vip{background:#f59e0b}
+        .hide{display:none}
     </style>
 </head>
 <body>
 <div class="container" id="app"></div>
 <script>
-const ADMIN_PASS = "awedsr134793";
-const WECHAT_ID = "475589411";
-const PAY_QR_URL = "wx.png";
+const ADMIN_PASS = "aweds123";
+const WECHAT = "475589411";
+const PAY_QR = "wx.png";
 
-// —————— 你要的邀请码已修改 ——————
 const CODE_CONFIG = {
-    "tiyan2026":  {name:"体验会员", days:1},
-    "yue2026":    {name:"月会员",   days:30},
-    "ji2026":     {name:"季会员",   days:90},
-    "nian2026":   {name:"年会员",   days:365},
-    "VIP999":     {name:"永久会员", days:99999}
+    "tiyan2026":{name:"体验会员",days:1},
+    "yue2026":{name:"月会员",days:30},
+    "ji2026":{name:"季会员",days:90},
+    "nian2026":{name:"年会员",days:365},
+    "VIP999":{name:"永久会员",days:99999}
 };
 
 let users = JSON.parse(localStorage.getItem("users")) || [];
@@ -204,40 +204,38 @@ let examHistory = JSON.parse(localStorage.getItem("examHistory")) || [];
 
 let currentUser = null;
 let nowPaperId = 0;
-let tempImage = "";
-let editingQid = null;
+let tempImg = "";
+let editQid = null;
 
 const MATH = [
     {n:"×",v:"\\times"},{n:"÷",v:"\\div"},
     {n:"½",v:"\\frac{1}{2}"},{n:"√",v:"\\sqrt{}"},{n:"²",v:"^2"},{n:"π",v:"\\pi"}
 ];
 
-function insert(id,v){
-    document.getElementById(id).value += "$"+v+"$";
-}
+function insert(id,v){document.getElementById(id).value += "$"+v+"$";}
 function mathBar(id){
     let h='<div class="math-bar">';
     MATH.forEach(m=>{h+=`<button class="math-btn" onclick="insert('${id}','${m.v}')">${m.n}</button>`;});
     return h+'</div>';
 }
-function saveAll(){
+function save(){
     localStorage.setItem("users",JSON.stringify(users));
     localStorage.setItem("papers",JSON.stringify(papers));
     localStorage.setItem("questions",JSON.stringify(questions));
     localStorage.setItem("wrongBooks",JSON.stringify(wrongBooks));
     localStorage.setItem("examHistory",JSON.stringify(examHistory));
 }
-function getDay(){return Math.floor(Date.now()/86400000);}
+function day(){return Math.floor(Date.now()/86400000);}
 
 // ========== 首页 ==========
 function home(){
     app.innerHTML=`
     <div class="card">
-        <div class="title">大湾区全科刷题系统</div>
+        <div class="title">大湾区全科</div>
+        <div class="sub-title">中小学智能刷题学习平台</div>
         <button class="btn" onclick="login()">学生登录</button>
         <button class="btn" onclick="reg()">注册账号</button>
         <button class="btn btn-light" onclick="adminLogin()">教师后台</button>
-        <div class="tip">无邀请码请联系管理员开通</div>
     </div>`;
 }
 
@@ -257,14 +255,8 @@ function loginGo(){
     let p = document.getElementById("p").value;
     let user = users.find(x=>x.username==u&&x.password==p);
     if(!user)return alert("账号或密码错误");
-    
-    let now = getDay();
     let expire = user.regDay + user.validDays;
-    if(now > expire){
-        alert("会员已过期，请联系管理员续费");
-        return;
-    }
-    
+    if(day()>expire)return alert("会员已到期");
     currentUser = user;
     student();
 }
@@ -273,133 +265,141 @@ function loginGo(){
 function reg(){
     app.innerHTML=`
     <div class="card">
-        <div class="title">注册账号</div>
+        <div class="title">注册</div>
         <input class="input" id="ru" placeholder="账号">
-        <input class="input" id="rp" type="password" placeholder="密码">
+        <input class="input" id="rp" placeholder="密码">
         <input class="input" id="rn" placeholder="姓名">
         <input class="input" id="rc" placeholder="邀请码">
         <button class="btn" onclick="regGo()">注册</button>
-        <button class="btn btn-light" onclick="pay()">开通会员</button>
-    </div>`;
-}
-function regGo(){
-    let u=document.getElementById("ru").value;
-    let p=document.getElementById("rp").value;
-    let n=document.getElementById("rn").value;
-    let c=document.getElementById("rc").value;
-    
-    if(!u||!p||!n||!c)return alert("请完整填写");
-    if(!CODE_CONFIG[c])return alert("邀请码无效");
-    
-    let days = CODE_CONFIG[c].days;
-    let type = CODE_CONFIG[c].name;
-    
-    users.push({
-        username:u, password:p, name:n,
-        regDay:getDay(), validDays:days, vipType:type
-    });
-    saveAll();
-    alert("注册成功！\n套餐："+type);
-    login();
-}
-
-// ========== 付费 ==========
-function pay(){
-    app.innerHTML=`
-    <div class="card">
-        <div class="title">会员开通</div>
-        <div class="price-item">✅ 体验会员 —— 9.9 元</div>
-        <div class="price-item">✅ 月会员 —— 38 元</div>
-        <div class="price-item">✅ 季会员 —— 68 元</div>
-        <div class="price-item">✅ 年会员 —— 128 元</div>
-        <div class="price-item">✅ 永久会员 —— 199 元</div>
-        <img src="${PAY_QR_URL}" class="qrcode">
-        <div class="text-center" style="font-weight:bold;color:#4287f5">微信：${WECHAT_ID}</div>
         <button class="btn btn-light" onclick="home()">返回</button>
     </div>`;
 }
+function regGo(){
+    let u=document.getElementById("ru").value,p=document.getElementById("rp").value;
+    let n=document.getElementById("rn").value,c=document.getElementById("rc").value;
+    if(!u||!p||!n||!c)return alert("请完整填写");
+    if(!CODE_CONFIG[c])return alert("邀请码无效");
+    users.push({
+        username:u,password:p,name:n,
+        regDay:day(),validDays:CODE_CONFIG[c].days,
+        vipType:CODE_CONFIG[c].name
+    });
+    save();
+    alert("注册成功！");
+    login();
+}
 
-// ========== 学生中心 ==========
+// ========== 学生中心（V2.0全新） ==========
 function student(){
+    let expire = currentUser.regDay + currentUser.validDays;
+    let left = expire - day();
     app.innerHTML=`
     <div class="card">
-        <div class="title">欢迎，${currentUser.name}</div>
-        <button class="btn" onclick="examList('math')">数学刷题</button>
-        <button class="btn" onclick="examList('chinese')">语文刷题</button>
-        <button class="btn" onclick="examList('english')">英语刷题</button>
-        <button class="btn btn-light" onclick="showWrong()">错题本</button>
-        <button class="btn btn-light" onclick="home()">退出</button>
+        <div class="title">你好，${currentUser.name}</div>
+        <div style="text-align:center;margin-bottom:20px">
+            <span class="tag ${currentUser.vipType.includes("体验")?"tag-test":
+              currentUser.vipType.includes("月")?"tag-month":
+              currentUser.vipType.includes("季")?"tag-season":
+              currentUser.vipType.includes("年")?"tag-year":"tag-vip"}">
+                ${currentUser.vipType}
+            </span>
+            <div style="font-size:13px;color:#666;margin-top:8px">剩余 ${left} 天</div>
+        </div>
+        <div class="subject-grid">
+            <div class="subject-item" onclick="examList('math')">数学</div>
+            <div class="subject-item" onclick="examList('chinese')">语文</div>
+            <div class="subject-item" onclick="examList('english')">英语</div>
+        </div>
+        <button class="btn btn-success" onclick="myData()">📊 学习数据</button>
+        <button class="btn btn-warning" onclick="showWrong()">📕 错题本</button>
+        <button class="btn btn-light" onclick="home()">退出登录</button>
     </div>`;
 }
+
+// ========== 学习数据（V2.0新增） ==========
+function myData(){
+    let myRecord = examHistory.filter(x=>x.user==currentUser.username);
+    let total = myRecord.length;
+    let scoreSum = 0;
+    myRecord.forEach(x=>{scoreSum+=x.score});
+    let avg = total>0 ? (scoreSum/total).toFixed(1) : 0;
+    let wrongNum = wrongBooks.filter(x=>x.user==currentUser.username).length;
+
+    app.innerHTML=`
+    <div class="card">
+        <div class="title">学习数据</div>
+        <div class="stat-box">
+            <div class="stat-row"><span>做题次数</span><span>${total}</span></div>
+            <div class="stat-row"><span>平均得分</span><span>${avg} 分</span></div>
+            <div class="stat-row"><span>错题数量</span><span>${wrongNum} 题</span></div>
+        </div>
+        <button class="btn btn-light" onclick="student()">返回</button>
+    </div>`;
+}
+
+// ========== 题库列表 ==========
 function examList(sub){
     let list = papers.filter(x=>x.sub==sub);
-    let h=`<div class="card"><div class="title">试卷列表</div>`;
+    let h=`<div class="card"><div class="title">${sub=="math"?"数学":sub=="chinese"?"语文":"英语"}题库</div>`;
     list.forEach(p=>{h+=`<button class="btn" onclick="startExam(${p.id})">${p.title}</button>`;});
     h+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
     app.innerHTML=h;
 }
 
-// ========== 考试答题 ==========
+// ========== 开始答题 ==========
 function startExam(pid){
+    nowPaperId = pid;
     let qs = questions.filter(x=>x.pid==pid);
     let h=`<div class="card"><div class="title">开始答题</div>`;
-    
     qs.forEach((q,i)=>{
-        h+=`<div style="margin:18px 0"><b>${i+1}.</b> <span class="mj-parse">${q.content}</span></div>`;
-        
+        h+=`<div style="margin:20px 0"><b>${i+1}.</b> <span class="mj-parse">${q.content}</span></div>`;
         if(q.type==1){
-            h+=`
-            <label><input type="radio" name="q_${i}" value="A"> A. ${q.op[0]}</label>
-            <label><input type="radio" name="q_${i}" value="B"> B. ${q.op[1]}</label>
-            <label><input type="radio" name="q_${i}" value="C"> C. ${q.op[2]}</label>
-            <label><input type="radio" name="q_${i}" value="D"> D. ${q.op[3]}</label>
-            `;
+            h+=`<label><input type="radio" name="q${i}" value="A"> A. ${q.op[0]}</label>
+            <label><input type="radio" name="q${i}" value="B"> B. ${q.op[1]}</label>
+            <label><input type="radio" name="q${i}" value="C"> C. ${q.op[2]}</label>
+            <label><input type="radio" name="q${i}" value="D"> D. ${q.op[3]}</label>`;
         }
         if(q.type==3){
-            h+=`
-            <label><input type="radio" name="q_${i}" value="对"> 对</label>
-            <label><input type="radio" name="q_${i}" value="错"> 错</label>
-            `;
+            h+=`<label><input type="radio" name="q${i}" value="对"> 对</label>
+            <label><input type="radio" name="q${i}" value="错"> 错</label>`;
         }
         if(q.type==4){
-            h+=`<input class="input" id="q_${i}" placeholder="输入答案">`;
+            h+=`<input class="input" id="q${i}" placeholder="请输入答案">`;
         }
     });
-
     h+=`<button class="btn btn-success" onclick="submitExam(${pid})">提交试卷</button></div>`;
-    app.innerHTML=h;
-    MathJax.typeset();
+    app.innerHTML=h;MathJax.typeset();
 }
 
+// ========== 交卷评分 ==========
 function submitExam(pid){
     let qs = questions.filter(x=>x.pid==pid);
-    let score = 0;
-    let wrongList = [];
-
+    let score=0;let wrong=[];
     qs.forEach((q,i)=>{
-        let val = "";
-        if(q.type==1 || q.type==3){
-            let selected = document.querySelector(`input[name="q_${i}"]:checked`);
-            val = selected ? selected.value : "";
-        }
-        if(q.type==4){
-            val = document.getElementById(`q_${i}`).value.trim();
-        }
-        if(val == q.answer) score++;
-        else wrongList.push(q);
+        let v="";
+        if(q.type==1||q.type==3){
+            let r=document.querySelector(`input[name="q${i}"]:checked`);
+            v=r?r.value:"";
+        }else v=document.getElementById(`q${i}`).value.trim();
+        if(v==q.answer)score++;
+        else wrong.push({...q,user:currentUser.username});
     });
-
-    wrongBooks.push(...wrongList);
-    examHistory.push({score:score,total:qs.length,time:new Date().toLocaleString()});
-    saveAll();
-    alert(`考试完成！\n得分：${score}/${qs.length}`);
+    examHistory.push({
+        user:currentUser.username,
+        score:score,total:qs.length,
+        time:new Date().toLocaleString()
+    });
+    wrongBooks.push(...wrong);
+    save();
+    alert(`完成！得分：${score}/${qs.length}`);
     student();
 }
 
+// ========== 错题本 ==========
 function showWrong(){
-    let list = wrongBooks;
-    let h=`<div class="card"><div class="title">错题本</div>`;
-    list.forEach(q=>{h+=`<div style="padding:10px 0;border-bottom:1px solid #eee"><span class="mj-parse">${q.content}</span></div>`;});
+    let list = wrongBooks.filter(x=>x.user==currentUser.username);
+    let h=`<div class="card"><div class="title">我的错题本</div>`;
+    list.forEach(q=>{h+=`<div style="padding:12px 0;border-bottom:1px solid #eee"><span class="mj-parse">${q.content}</span></div>`;});
     h+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
     app.innerHTML=h;MathJax.typeset();
 }
@@ -409,7 +409,7 @@ function adminLogin(){
     app.innerHTML=`
     <div class="card">
         <div class="title">教师后台</div>
-        <input class="input" id="pwd" type="password" placeholder="请输入管理员密码">
+        <input class="input" id="pwd" type="password" placeholder="管理员密码">
         <button class="btn" onclick="if(document.getElementById('pwd').value==ADMIN_PASS)admin()">登录</button>
     </div>`;
 }
@@ -418,32 +418,31 @@ function admin(){
     <div class="card">
         <div class="title">管理中心</div>
         <button class="btn" onclick="addPaper()">新建试卷</button>
-        <button class="btn" onclick="paperList()">管理题目</button>
-        <button class="btn" onclick="batchImport()">批量导入</button>
-        <button class="btn" onclick="picQuestion()">图片题目</button>
-        <button class="btn" onclick="userList()">👤 用户管理</button>
-        <button class="btn" onclick="createInvite()">生成邀请码</button>
+        <button class="btn" onclick="paperList()">管理题库</button>
+        <button class="btn" onclick="userList()">用户管理</button>
+        <button class="btn" onclick="showCodes()">邀请码</button>
         <button class="btn btn-light" onclick="home()">退出</button>
     </div>`;
 }
 
 // ========== 试卷管理 ==========
 function addPaper(){
-    let title=prompt("请输入试卷名称");
+    let title=prompt("试卷名称");
     if(!title)return;
-    papers.push({id:Date.now(),title:title,sub:"math"});
-    saveAll();paperList();
+    let sub=prompt("科目：math/chinese/english");
+    papers.push({id:Date.now(),title:title,sub:sub});
+    save();paperList();
 }
 function paperList(){
-    let h=`<div class="card"><div class="title">试卷管理</div>`;
+    let h=`<div class="card"><div class="title">试卷列表</div>`;
     papers.forEach(p=>{h+=`<button class="btn" onclick="goPaper(${p.id})">${p.title}</button>`;});
     h+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;
     app.innerHTML=h;
 }
 
-// ========== 出题（增删改） ==========
+// ========== 出题 ==========
 function goPaper(pid){
-    nowPaperId=pid;editingQid=null;
+    nowPaperId=pid;editQid=null;
     let qs=questions.filter(x=>x.pid==pid);
     let h=`
     <div class="card">
@@ -453,30 +452,27 @@ function goPaper(pid){
             <button onclick="tab(3)" id="t3">判断</button>
             <button onclick="tab(4)" id="t4">填空</button>
         </div>
-
         <div id="m1">
             ${mathBar("c1")}
-            <textarea class="input" id="c1" placeholder="请输入题目"></textarea>
-            <input class="input" id="a1" placeholder="选项 A">
-            <input class="input" id="b1" placeholder="选项 B">
-            <input class="input" id="c1i" placeholder="选项 C">
-            <input class="input" id="d1" placeholder="选项 D">
-            <input class="input" id="ans1" placeholder="答案(A/B/C/D)">
+            <textarea class="input" id="c1" placeholder="题目"></textarea>
+            <input class="input" id="a1" placeholder="A">
+            <input class="input" id="b1" placeholder="B">
+            <input class="input" id="c1i" placeholder="C">
+            <input class="input" id="d1" placeholder="D">
+            <input class="input" id="ans1" placeholder="答案">
         </div>
         <div id="m3" class="hide">
             ${mathBar("c3")}
-            <textarea class="input" id="c3" placeholder="请输入题目"></textarea>
-            <input class="input" id="ans3" placeholder="答案(对/错)">
+            <textarea class="input" id="c3" placeholder="题目"></textarea>
+            <input class="input" id="ans3" placeholder="对/错">
         </div>
         <div id="m4" class="hide">
             ${mathBar("c4")}
-            <textarea class="input" id="c4" placeholder="请输入题目"></textarea>
+            <textarea class="input" id="c4" placeholder="题目"></textarea>
             <input class="input" id="ans4" placeholder="答案">
         </div>
-
         <button class="btn btn-success" onclick="saveQ()">保存题目</button>
-        <div style="margin:20px 0;font-weight:bold;color:#4287f5">已有题目：</div>`;
-
+        <div style="margin:20px 0;font-weight:bold">题目列表</div>`;
     qs.forEach(q=>{
         h+=`
         <div class="q-item">
@@ -487,18 +483,15 @@ function goPaper(pid){
             </div>
         </div>`;
     });
-
     h+=`<button class="btn btn-light" onclick="paperList()">返回</button></div>`;
     app.innerHTML=h;MathJax.typeset();
 }
-
 function tab(n){
     document.querySelectorAll("#m1,#m3,#m4").forEach(x=>x.classList.add("hide"));
     document.querySelectorAll(".tab button").forEach(x=>x.classList.remove("active"));
     document.getElementById("m"+n).classList.remove("hide");
     document.getElementById("t"+n).classList.add("active");
 }
-
 function saveQ(){
     let t=document.querySelector(".tab button.active").innerText;
     let content,op=[],ans,type=1;
@@ -509,73 +502,48 @@ function saveQ(){
     }
     if(t.includes("判")){type=3; content=document.getElementById("c3").value; ans=document.getElementById("ans3").value;}
     if(t.includes("填")){type=4; content=document.getElementById("c4").value; ans=document.getElementById("ans4").value;}
-    if(!content||!ans)return alert("题目和答案不能为空");
-    if(editingQid)questions=questions.filter(x=>x.id!=editingQid);
+    if(!content||!ans)return alert("不能为空");
+    if(editQid)questions=questions.filter(x=>x.id!=editQid);
     questions.push({id:Date.now(),pid:nowPaperId,type:type,content:content,op:op,answer:ans});
-    saveAll();goPaper(nowPaperId);
+    save();goPaper(nowPaperId);
 }
-function editQ(id){editingQid=id;let q=questions.find(x=>x.id==id);
-    if(q.type==1){tab(1);document.getElementById("c1").value=q.content;document.getElementById("a1").value=q.op[0];document.getElementById("b1").value=q.op[1];document.getElementById("c1i").value=q.op[2];document.getElementById("d1").value=q.op[3];document.getElementById("ans1").value=q.answer;}
+function editQ(id){
+    editQid=id;let q=questions.find(x=>x.id==id);
+    if(q.type==1){tab(1);document.getElementById("c1").value=q.content;
+    document.getElementById("a1").value=q.op[0];document.getElementById("b1").value=q.op[1];
+    document.getElementById("c1i").value=q.op[2];document.getElementById("d1").value=q.op[3];
+    document.getElementById("ans1").value=q.answer;}
     if(q.type==3){tab(3);document.getElementById("c3").value=q.content;document.getElementById("ans3").value=q.answer;}
     if(q.type==4){tab(4);document.getElementById("c4").value=q.content;document.getElementById("ans4").value=q.answer;}
 }
-function delQ(id){if(!confirm("确定删除该题目？"))return;questions=questions.filter(x=>x.id!=id);saveAll();goPaper(nowPaperId);}
+function delQ(id){if(!confirm("确定删除？"))return;questions=questions.filter(x=>x.id!=id);save();goPaper(nowPaperId);}
 
-// ========== 用户管理 ==========
+// ========== 用户管理（V2.0） ==========
 function userList(){
-    let h = `<div class="card"><div class="title">用户管理</div>`;
-    users.forEach((u, index)=>{
-        let now = getDay();
-        let expireDay = u.regDay + u.validDays;
-        let left = expireDay - now;
-        let status = left > 0 ? `剩余 ${left} 天` : "已过期";
-        
-        let tagClass = "";
-        if(u.vipType.includes("体验")) tagClass = "user-tag tag-test";
-        if(u.vipType.includes("月")) tagClass = "user-tag tag-month";
-        if(u.vipType.includes("季")) tagClass = "user-tag tag-season";
-        if(u.vipType.includes("年")) tagClass = "user-tag tag-year";
-        if(u.vipType.includes("永久")) tagClass = "user-tag tag-vip";
-
-        h += `
+    let h=`<div class="card"><div class="title">用户管理</div>`;
+    users.forEach((u,i)=>{
+        let l = u.regDay+u.validDays-day();
+        h+=`
         <div class="user-item">
-            ${u.name} (${u.username})
-            <span class="${tagClass}">${u.vipType}</span>
-            <div style="font-size:12px;color:#666;margin-top:5px">状态：${status}</div>
-            <button class="btn-danger" style="width:auto;padding:6px 10px;font-size:12px;margin-top:8px" onclick="delUser(${index})">删除用户</button>
+            ${u.name} @${u.username}<br>
+            ${u.vipType} | 剩余 ${l} 天<br>
+            <button class="btn-danger" style="width:auto;padding:6px 10px;margin-top:8px" onclick="delUser(${i})">删除</button>
         </div>`;
     });
-    h += `<button class="btn btn-light" onclick="admin()">返回</button></div>`;
-    app.innerHTML = h;
+    h+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;
+    app.innerHTML=h;
 }
-function delUser(index){
-    if(!confirm("确定删除该用户？")) return;
-    users.splice(index, 1);
-    saveAll();
-    userList();
-}
+function delUser(i){if(!confirm("确定删除？"))return;users.splice(i,1);save();userList();}
 
 // ========== 邀请码 ==========
-function createInvite(){
-    let list = [
-        {k:"tiyan2026",v:"体验会员"},
-        {k:"yue2026",v:"月会员"},
-        {k:"ji2026",v:"季会员"},
-        {k:"nian2026",v:"年会员"},
-        {k:"VIP999",v:"永久会员"}
-    ];
-    let str = "";
-    list.forEach(x=>{ str += x.k + " —— " + x.v + "\n"; });
-    alert("可用邀请码：\n\n"+str);
+function showCodes(){
+    alert(`邀请码列表：
+体验：tiyan2026
+月卡：yue2026
+季卡：ji2026
+年卡：nian2026
+永久：VIP999`);
 }
-
-// ========== 完整功能 ==========
-function batchImport(){app.innerHTML=`<div class="card"><div class="title">批量导入</div><div class="tip">格式：题目|A|B|C|D|答案</div><textarea class="input" rows="8" id="batch"></textarea><button class="btn" onclick="batchGo()">导入</button></div>`;}
-function batchGo(){document.getElementById("batch").value.split("\n").forEach(line=>{let a=line.split("|");questions.push({id:Date.now(),pid:nowPaperId,type:1,content:a[0],op:[a[1],a[2],a[3],a[4]],answer:a[5]});});saveAll();alert("导入成功");admin();}
-function picQuestion(){tempImage="";app.innerHTML=`<div class="card"><div class="title">图片题目</div><input type="file" accept="image/*" onchange="preImg(event)"><button class="btn" onclick="editPic()">下一步</button></div>`;}
-function preImg(e){let f=new FileReader();f.onload=e=>tempImage=e.target.result;f.readAsDataURL(e.target.files[0]);}
-function editPic(){app.innerHTML=`<div class="card"><div class="title">编辑图片题目</div>${mathBar("pc")}<textarea class="input" id="pc"></textarea><input class="input" id="pa" placeholder="答案"><button class="btn" onclick="savePic()">保存</button></div>`;}
-function savePic(){questions.push({id:Date.now(),pid:nowPaperId,type:1,content:document.getElementById("pc").value,img:tempImage,answer:document.getElementById("pa").value});saveAll();admin();}
 
 home();
 </script>
