@@ -1,363 +1,319 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>大湾区全科智能刷题系统</title>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <style>
-        *{box-sizing:border-box}
-        body{background:#f5f4f9;margin:0;padding:15px;font-family:Arial,"微软雅黑"}
+        *{margin:0;padding:0;box-sizing:border-box;font-family: "Microsoft YaHei",sans-serif}
+        body{background:linear-gradient(135deg,#f7f8fa 0%,#eef2f5 100%);min-height:100vh;padding:15px}
         .container{max-width:500px;margin:auto}
-        .card{background:white;border-radius:16px;padding:22px;margin:10px 0;box-shadow:0 2px 10px #00000010}
-        .title{text-align:center;font-size:20px;font-weight:bold;margin:10px 0}
-        input,textarea,select{width:100%;padding:12px;margin:6px 0;border:1px solid #ddd;border-radius:8px}
-        button{width:100%;padding:12px;background:#2c52ed;color:white;border:none;border-radius:8px;margin:6px 0}
-        .btn-green{background:#009688}
-        .math-bar{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}
-        .math-btn{padding:6px 10px;background:#eef5ff;border:none;border-radius:6px;color:#2c52ed}
+        .card{background:#fff;border-radius:20px;padding:25px;margin:12px 0;box-shadow:0 10px 30px rgba(0,20,60,0.08)}
+        .title{font-size:22px;font-weight:bold;color:#2d3748;text-align:center;margin-bottom:20px}
+        .btn{width:100%;padding:15px;border:none;border-radius:14px;font-size:16px;margin:8px 0;background:#4361ee;color:#fff;cursor:pointer}
+        .btn-success{background:#10b981}
+        .btn-light{background:#f1f5f9;color:#4361ee}
+        .input{width:100%;padding:14px 16px;border:1px solid #e2e8f0;border-radius:14px;margin:8px 0;font-size:15px;background:#fafbfc}
         .text-center{text-align:center}
-        .red{color:red}
-        .tip{font-size:12px;color:#666;margin-top:5px}
+        .red{color:#ef4444}
+        .tip{font-size:12px;color:#9ca3af;text-align:center;margin-top:10px}
+        .price-item{padding:12px 16px;background:#f9fafb;border-radius:12px;margin:6px 0;font-size:15px}
+        .qrcode{width:180px;margin:15px auto;border-radius:12px;display:block}
+        .math-tool{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+        .math-btn{padding:8px 10px;background:#e0e7ff;border:none;border-radius:8px;color:#4361ee}
+        .tab{display:flex;gap:5px;margin-bottom:10px}
+        .tab button{flex:1;padding:10px;border-radius:10px;border:none;background:#f1f5f9}
+        .tab button.active{background:#4361ee;color:#fff}
+        .hide{display:none}
+        .import-box{border:2px dashed #cbd5e1;padding:25px;border-radius:16px;text-align:center;margin:10px 0}
     </style>
 </head>
 <body>
 <div class="container" id="app"></div>
 <script>
 const ADMIN_PASS = "awedsr134793";
+const PAY_QR_URL = "wx.png";
 const WECHAT_ID = "475589411";
-const PAY_QR_URL = "pay.png";
-const SYS_NOTICE = "欢迎使用大湾区全科智能刷题系统！\n付费请联系管理员微信，切勿私下转账。";
-const CODE_CONFIG = {"YZW2026":{type:"内部永久会员",days:99999}};
 
-const SUBJECT_LIST = [
-    {key:"math",name:"数学",cls:"tag-sx"},
-    {key:"chinese",name:"语文",cls:"tag-yw"},
-    {key:"english",name:"英语",cls:"tag-yy"}
-];
-const QUESTION_TYPES = {1:"单选题",2:"多选题",3:"判断题",4:"填空题"};
+let users = JSON.parse(localStorage.getItem("users"))||[];
+let papers = JSON.parse(localStorage.getItem("papers"))||[];
+let questions = JSON.parse(localStorage.getItem("questions"))||[];
+let currentUser=null, nowPaperId=0;
 
-let users = JSON.parse(localStorage.getItem("users")) || [];
-let papers = JSON.parse(localStorage.getItem("papers")) || [];
-let questions = JSON.parse(localStorage.getItem("questions")) || [];
-let wrongBooks = JSON.parse(localStorage.getItem("wrongBooks")) || [];
-let currentUser = null;
-let nowPaperId = 0;
-let tempImage = "";
-
-// ==========================
-// 数学公式 + 分数 一键按钮
-// ==========================
-const MATH_TOOLS = [
-    {name:"+",val:"+"},
-    {name:"-",val:"-"},
-    {name:"×",val:"\\times"},
-    {name:"÷",val:"\\div"},
-    {name:"=",val:"="},
-    {name:"≠",val:"\\neq"},
-    {name:"≤",val:"\\leq"},
-    {name:"≥",val:"\\geq"},
-    {name:"½",val:"\\frac{1}{2}"},
-    {name:"⅓",val:"\\frac{1}{3}"},
-    {name:"¼",val:"\\frac{1}{4}"},
-    {name:"分数",val:"\\frac{}{}"},
-    {name:"平方",val:"^2"},
-    {name:"立方",val:"^3"},
-    {name:"根号",val:"\\sqrt{}"},
-    {name:"π",val:"\\pi"}
+const MATH = [
+    {n:"×",v:"\\times"},{n:"÷",v:"\\div"},{n:"=",v:"="},{n:"≠",v:"\\neq"},
+    {n:"½",v:"\\frac{1}{2}"},{n:"⅓",v:"\\frac{1}{3}"},{n:"分数",v:"\\frac{}{}"},
+    {n:"平方",v:"^2"},{n:"根号",v:"\\sqrt{}"},{n:"π",v:"\\pi"}
 ];
 
-function insertToTextarea(id, val){
-    let el = document.getElementById(id);
-    let pos = el.selectionStart;
-    let v = el.value;
-    el.value = v.slice(0, pos) + val + v.slice(pos);
-    el.focus();
-}
-function renderMathTools(targetId){
-    let html = `<div class="math-bar">`;
-    MATH_TOOLS.forEach(m=>{
-        html+=`<button class="math-btn" onclick="insertToTextarea('${targetId}','${m.val}')">${m.name}</button>`;
-    });
-    return html+`</div>`;
+function insert(id,v){
+    let t=document.getElementById(id);
+    t.value += v;
+    t.focus();
 }
 
-// ==========================
-// 数据保存
-// ==========================
-function saveData(){
+function mathBar(id){
+    let h='<div class="math-tool">';
+    MATH.forEach(m=>{h+=`<button class="math-btn" onclick="insert('${id}','${m.v}')">${m.n}</button>`});
+    return h+'</div>';
+}
+
+function save(){
     localStorage.setItem("users",JSON.stringify(users));
     localStorage.setItem("papers",JSON.stringify(papers));
     localStorage.setItem("questions",JSON.stringify(questions));
-    localStorage.setItem("wrongBooks",JSON.stringify(wrongBooks));
-}
-function getNowDay(){return Math.floor(Date.now()/86400000);}
-function dayToDate(dayNum){
-    let d = new Date(dayNum*86400000);
-    return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,0)+"-"+String(d.getDate()).padStart(2,0);
 }
 
-// ==========================
-// 首页
-// ==========================
-function renderHome(){
+// ====================== 首页 ======================
+function home(){
     app.innerHTML=`
     <div class="card">
         <div class="title">全科智能刷题系统</div>
-        <button onclick="renderLogin()">学生登录</button>
-        <button onclick="renderRegister()">注册账号</button>
-        <button onclick="renderAdminLogin()">教师后台</button>
-        <div class="text-center tip mt10">无邀请码请联系管理员付费开通</div>
+        <button class="btn" onclick="login()">学生登录</button>
+        <button class="btn" onclick="reg()">注册账号</button>
+        <button class="btn btn-light" onclick="adminLogin()">教师后台</button>
+        <div class="tip">无邀请码请联系管理员付费开通</div>
     </div>`;
 }
 
-// ==========================
-// 注册
-// ==========================
-function renderRegister(){
+// ====================== 注册 ======================
+function reg(){
     app.innerHTML=`
     <div class="card">
         <div class="title">账号注册</div>
-        <input id="regUser" placeholder="账号">
-        <input id="regPwd" placeholder="密码" type="password">
-        <input id="regName" placeholder="姓名">
-        <input id="regGrade" placeholder="年级">
-        <input id="regCode" placeholder="邀请码">
-        <button onclick="doRegister()">立即注册</button>
-        <div class="text-center mt10">
-            <span style="color:red;cursor:pointer" onclick="renderPay()">没有邀请码？付费获取</span>
-        </div>
-        <button onclick="renderHome()">返回</button>
+        <input class="input" id="u" placeholder="账号">
+        <input class="input" id="p" type="password" placeholder="密码">
+        <input class="input" id="name" placeholder="姓名">
+        <input class="input" id="code" placeholder="邀请码">
+        <button class="btn" onclick="regGo()">注册</button>
+        <button class="btn btn-light" onclick="pay()">付费开通</button>
+        <button class="btn btn-light" onclick="home()">返回</button>
     </div>`;
 }
-function doRegister(){
-    let u = document.getElementById("regUser").value.trim();
-    let p = document.getElementById("regPwd").value.trim();
-    let n = document.getElementById("regName").value.trim();
-    let g = document.getElementById("regGrade").value.trim();
-    let c = document.getElementById("regCode").value.trim();
-    if(!u||!p||!n||!g||!c)return alert("所有栏目不能为空！");
-    if(users.find(x=>x.username===u))return alert("账号已存在");
-    if(!CODE_CONFIG[c])return alert("邀请码无效");
-    users.push({
-        username:u,password:p,name:n,grade:g,inviteCode:c,
-        regDay:getNowDay(),validDays:CODE_CONFIG[c].days,disabled:false
-    });
-    saveData();alert("注册成功！");renderLogin();
+function regGo(){
+    let u=document.getElementById("u").value,p=document.getElementById("p").value,name=document.getElementById("name").value,code=document.getElementById("code").value;
+    if(!u||!p||!name||!code)return alert("请完整填写");
+    users.push({user:u,pwd:p,name:name,days:99999});
+    save();alert("注册成功");login();
 }
 
-// ==========================
-// 登录
-// ==========================
-function renderLogin(){
+// ====================== 登录 ======================
+function login(){
     app.innerHTML=`
     <div class="card">
-        <div class="title">用户登录</div>
-        <input id="logUser" placeholder="账号">
-        <input id="logPwd" placeholder="密码" type="password">
-        <button onclick="doLogin()">登录</button>
-        <button onclick="renderHome()">返回</button>
+        <div class="title">学生登录</div>
+        <input class="input" id="u" placeholder="账号">
+        <input class="input" id="p" type="password" placeholder="密码">
+        <button class="btn" onclick="loginGo()">登录</button>
+        <button class="btn btn-light" onclick="home()">返回</button>
     </div>`;
 }
-function doLogin(){
-    let u = document.getElementById("logUser").value.trim();
-    let p = document.getElementById("logPwd").value.trim();
-    let user = users.find(x=>x.username===u&&x.password===p);
+function loginGo(){
+    let user=users.find(x=>x.user==document.getElementById("u").value&&x.pwd==document.getElementById("p").value);
     if(!user)return alert("账号密码错误");
-    if(user.disabled)return alert("账号已禁用");
-    if(getNowDay()-user.regDay>user.validDays)return alert("会员已过期");
-    currentUser = user;renderStudentMain();
+    currentUser=user;student();
 }
 
-// ==========================
-// 学生中心
-// ==========================
-function renderStudentMain(){
-    let left = currentUser.validDays - (getNowDay()-currentUser.regDay);
+// ====================== 学生中心 ======================
+function student(){
     app.innerHTML=`
     <div class="card">
-        <div class="title">欢迎 ${currentUser.name}</div>
-        <div class="text-center">剩余会员天数：<span class="red">${left>0?left:0}</span></div>
-        <button onclick="renderPaperListBySub('math')">数学刷题</button>
-        <button onclick="renderPaperListBySub('chinese')">语文刷题</button>
-        <button onclick="renderPaperListBySub('english')">英语刷题</button>
-        <button onclick="renderWrongBook()">错题本</button>
-        <button onclick="renderHome()">退出</button>
+        <div class="title">欢迎 ${currentUser.name}</title>
+        <button class="btn" onclick="toExam('math')">数学刷题</button>
+        <button class="btn" onclick="toExam('chinese')">语文刷题</button>
+        <button class="btn" onclick="toExam('english')">英语刷题</button>
+        <button class="btn btn-light" onclick="home()">退出</button>
     </div>`;
 }
-function renderPaperListBySub(sub){
-    let list = papers.filter(p=>p.subject===sub);
-    let h=`<div class="card"><div class="title">试卷列表</div>`;
-    list.forEach(p=>{h+=`<button onclick="startExam(${p.id})">${p.title}</button>`;});
-    h+=`<button onclick="renderStudentMain()">返回</button></div>`;
+function toExam(sub){
+    let list=papers.filter(x=>x.sub==sub);
+    let h=`<div class="card"><div class="title">试卷</div>`;
+    list.forEach(p=>{h+=`<button class="btn" onclick="start(${p.id})">${p.name}</button>`});
+    h+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
     app.innerHTML=h;
 }
-function startExam(pid){
-    let qs = questions.filter(q=>q.paper_id===pid);
+function start(pid){
+    let qs=questions.filter(x=>x.pid==pid);
     let h=`<div class="card"><div class="title">开始答题</div>`;
     qs.forEach((q,i)=>{
-        h+=`<div style="margin:12px 0"><div>${i+1}. <span class="mj-parse">${q.content}</span></div>`;
-        if(q.image)h+=`<img src="${q.image}" style="max-width:100%;border-radius:8px;margin:5px 0">`;
-        if(q.type==1||q.type==2){
-            h+=`<div style="padding-left:10px">A. ${q.options[0]}</div>`;
-            h+=`<div style="padding-left:10px">B. ${q.options[1]}</div>`;
-            h+=`<div style="padding-left:10px">C. ${q.options[2]}</div>`;
-            h+=`<div style="padding-left:10px">D. ${q.options[3]}</div>`;
-        }
-        if(q.type==3)h+=`<div>○ 对   ○ 错</div>`;
-        if(q.type==4)h+=`<input placeholder="请输入答案">`;
+        h+=`<div style="margin:15px 0"><div>${i+1}、<span class="mj-parse">${q.title}</span></div>`;
+        if(q.type==1){h+=`<div>A ${q.a}</div><div>B ${q.b}</div><div>C ${q.c}</div><div>D ${q.d}</div>`;}
+        if(q.type==2){h+=`<div>A ${q.a}</div><div>B ${q.b}</div><div>C ${q.c}</div><div>D ${q.d}</div>`;}
+        if(q.type==3){h+=`<div>○ 对   ○ 错</div>`;}
+        if(q.type==4){h+=`<input class="input" placeholder="请输入答案">`;}
         h+=`</div>`;
     });
-    h+=`<button class="btn-green" onclick="alert('提交成功');renderStudentMain()">提交试卷</button></div>`;
+    h+=`<button class="btn btn-success" onclick="alert('提交成功');student()">提交</button></div>`;
     app.innerHTML=h;MathJax.typeset();
 }
-function renderWrongBook(){
-    app.innerHTML=`<div class="card"><div class="title">错题本</div><div class="text-center">暂无错题</div><button onclick="renderStudentMain()">返回</button></div>`;
-}
 
-// ==========================
-// 付款页面（你的完整套餐）
-// ==========================
-function renderPay(){
+// ====================== 付费页面 ======================
+function pay(){
     app.innerHTML=`
     <div class="card">
         <div class="title">会员开通</div>
-        <div>✅ 体验会员：9.9元</div>
-        <div>✅ 月会员：38元</div>
-        <div>✅ 季度会员：68元</div>
-        <div>✅ 年度会员：128元</div>
-        <div>✅ 永久会员：199元</div>
-        <img src="${PAY_QR_URL}" style="width:180px;margin:10px auto;display:block;border-radius:10px">
+        <div class="price-item">✅ 体验会员 9.9 元</div>
+        <div class="price-item">✅ 月会员 38 元</div>
+        <div class="price-item">✅ 季度会员 68 元</div>
+        <div class="price-item">✅ 年度会员 128 元</div>
+        <div class="price-item">✅ 永久会员 199 元</div>
+        <img src="${PAY_QR_URL}" class="qrcode">
         <div class="text-center">微信：${WECHAT_ID}</div>
-        <div class="text-center tip">付款后联系管理员获取邀请码</div>
-        <button onclick="renderHome()">返回</button>
+        <button class="btn btn-light" onclick="home()">返回</button>
     </div>`;
 }
 
-// ==========================
-// 教师后台（100% 全部功能）
-// ==========================
-function renderAdminLogin(){
+// ====================== 教师后台 ======================
+function adminLogin(){
     app.innerHTML=`
     <div class="card">
-        <div class="title">教师后台</div>
-        <input id="adminPwd" type="password" placeholder="密码">
-        <button onclick="checkAdminLogin()">登录</button>
-        <button onclick="renderHome()">返回</button>
+        <div class="title">教师登录</div>
+        <input class="input" id="pwd" type="password" placeholder="密码">
+        <button class="btn" onclick="adminGo()">登录</button>
+        <button class="btn btn-light" onclick="home()">返回</button>
     </div>`;
 }
-function checkAdminLogin(){
-    if(document.getElementById("adminPwd").value===ADMIN_PASS)renderAdminMain();
+function adminGo(){
+    if(document.getElementById("pwd").value==ADMIN_PASS)admin();
     else alert("密码错误");
 }
-function renderAdminMain(){
+function admin(){
     app.innerHTML=`
     <div class="card">
         <div class="title">管理中心</div>
-        <button onclick="adminCreatePaper()">新建试卷</button>
-        <button onclick="adminPaperList()">试卷管理</button>
-        <button onclick="adminBatchImport()">批量导入试题</button>
-        <button onclick="adminPicPage()">上传图片题目</button>
-        <button onclick="adminUserList()">用户管理</button>
-        <button onclick="adminCreateInvite()">生成邀请码</button>
-        <button onclick="exportAllData()">导出数据</button>
-        <button onclick="renderHome()">退出</button>
+        <button class="btn" onclick="addPaper()">新建试卷</button>
+        <button class="btn" onclick="paperList()">管理试卷</button>
+        <button class="btn btn-success" onclick="importFile()">📁 微信文件导入出题</button>
+        <button class="btn btn-light" onclick="home()">退出</button>
     </div>`;
 }
 
-// ==========================
-// 试卷管理
-// ==========================
-function adminCreatePaper(){
+// ====================== 试卷 ======================
+function addPaper(){
     let name=prompt("试卷名称");
-    let sub=prompt("科目：math/chinese/english");
-    if(!name||!SUBJECT_LIST.find(x=>x.key===sub))return;
-    papers.push({id:Date.now(),title:name,subject:sub});
-    saveData();alert("创建成功");adminPaperList();
+    if(!name)return;
+    papers.push({id:Date.now(),name:name,sub:"math"});
+    save();alert("创建成功");paperList();
 }
-function adminPaperList(){
+function paperList(){
     let h=`<div class="card"><div class="title">试卷列表</div>`;
-    papers.forEach(p=>{h+=`<button onclick="adminManagePaper(${p.id})">${p.title}</button>`;});
-    h+=`<button onclick="renderAdminMain()">返回</button></div>`;
+    papers.forEach(p=>{h+=`<button class="btn" onclick="goPaper(${p.id})">${p.name}</button>`});
+    h+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;
     app.innerHTML=h;
 }
-function adminManagePaper(pid){
+
+// ====================== 【核心：按题型自动切换界面】 ======================
+function goPaper(pid){
     nowPaperId=pid;
-    let list=questions.filter(q=>q.paper_id===pid);
-    let h=`<div class="card"><div class="title">题目管理</div>`;
-    h+=`<button onclick="adminAddQuestion()">添加题目</button>`;
-    list.forEach(q=>{
-        h+=`<div style="margin:8px 0"><span class="mj-parse">${q.content}</span><br>答案：${q.answer}</div><hr>`;
-    });
-    h+=`<button onclick="adminPaperList()">返回</button></div>`;
+    let type=1;
+    let qs=questions.filter(x=>x.pid==pid);
+    let h=`<div class="card"><div class="title">出题中心</div>`;
+    h+=`
+    <div class="tab">
+        <button onclick="tab(1)" id="t1" class="active">单选题</button>
+        <button onclick="tab(2)" id="t2">多选题</button>
+        <button onclick="tab(3)" id="t3">判断题</button>
+        <button onclick="tab(4)" id="t4">填空题</button>
+    </div>
+    <div id="type1">
+        ${mathBar("title")}
+        <input class="input" id="title" placeholder="题目">
+        <input class="input" id="a" placeholder="选项A">
+        <input class="input" id="b" placeholder="选项B">
+        <input class="input" id="c" placeholder="选项C">
+        <input class="input" id="d" placeholder="选项D">
+        <input class="input" id="ans" placeholder="答案（A/B/C/D）">
+    </div>
+    <div id="type2" class="hide">
+        ${mathBar("title2")}
+        <input class="input" id="title2" placeholder="题目">
+        <input class="input" id="a2" placeholder="选项A">
+        <input class="input" id="b2" placeholder="选项B">
+        <input class="input" id="c2" placeholder="选项C">
+        <input class="input" id="d2" placeholder="选项D">
+        <input class="input" id="ans2" placeholder="答案（如：AB）">
+    </div>
+    <div id="type3" class="hide">
+        ${mathBar("title3")}
+        <input class="input" id="title3" placeholder="题目">
+        <input class="input" id="ans3" placeholder="答案（对/错）">
+    </div>
+    <div id="type4" class="hide">
+        ${mathBar("title4")}
+        <input class="input" id="title4" placeholder="题目">
+        <input class="input" id="ans4" placeholder="答案">
+    </div>
+    <button class="btn btn-success" onclick="saveQ()">💾 一键保存题目</button>
+    <button class="btn btn-light" onclick="paperList()">返回</button>
+    <div style="margin-top:20px">`;
+    qs.forEach(q=>{h+=`<div style="padding:10px;border-bottom:1px solid #eee"><span class="mj-parse">${q.title}</span></div>`;});
+    h+=`</div></div>`;
     app.innerHTML=h;MathJax.typeset();
 }
 
-// ==========================
-// 出题（简单 + 公式 + 分数）
-// ==========================
-function adminAddQuestion(){
+function tab(n){
+    document.getElementById("type1").classList.add("hide");
+    document.getElementById("type2").classList.add("hide");
+    document.getElementById("type3").classList.add("hide");
+    document.getElementById("type4").classList.add("hide");
+    document.getElementById("t1").classList.remove("active");
+    document.getElementById("t2").classList.remove("active");
+    document.getElementById("t3").classList.remove("active");
+    document.getElementById("t4").classList.remove("active");
+    document.getElementById("type"+n).classList.remove("hide");
+    document.getElementById("t"+n).classList.add("active");
+}
+
+// ====================== 【核心：一键保存】 ======================
+function saveQ(){
+    let t = document.querySelector(".tab button.active").innerText;
+    let title,a,b,c,d,ans,type=0;
+
+    if(t.includes("单选")){type=1;title=document.getElementById("title").value;a=document.getElementById("a").value;b=document.getElementById("b").value;c=document.getElementById("c").value;d=document.getElementById("d").value;ans=document.getElementById("ans").value;}
+    if(t.includes("多选")){type=2;title=document.getElementById("title2").value;a=document.getElementById("a2").value;b=document.getElementById("b2").value;c=document.getElementById("c2").value;d=document.getElementById("d2").value;ans=document.getElementById("ans2").value;}
+    if(t.includes("判断")){type=3;title=document.getElementById("title3").value;ans=document.getElementById("ans3").value;}
+    if(t.includes("填空")){type=4;title=document.getElementById("title4").value;ans=document.getElementById("ans4").value;}
+
+    if(!title||!ans)return alert("题目和答案不能为空");
+    questions.push({id:Date.now(),pid:nowPaperId,type,title,a,b,c,d,ans});
+    save();alert("✅ 出题成功！");goPaper(nowPaperId);
+}
+
+// ====================== 【核心：微信文件导入出题】 ======================
+function importFile(){
     app.innerHTML=`
     <div class="card">
-        <div class="title">添加题目</div>
-        <select id="qType">
-            <option value="1">单选题</option>
-            <option value="2">多选题</option>
-            <option value="3">判断题</option>
-            <option value="4">填空题</option>
-        </select>
-        <div>题目内容：</div>
-        ${renderMathTools("qContent")}
-        <textarea id="qContent" placeholder="输入题目，点按钮插入公式/分数"></textarea>
-        <input id="optA" placeholder="选项A">
-        <input id="optB" placeholder="选项B">
-        <input id="optC" placeholder="选项C">
-        <input id="optD" placeholder="选项D">
-        <input id="qAns" placeholder="正确答案">
-        <button class="btn-green" onclick="saveAdminQuestion()">保存题目</button>
-        <button onclick="adminManagePaper(${nowPaperId})">返回</button>
+        <div class="title">微信文件导入出题</div>
+        <div class="import-box">
+            <div>📁 选择微信文件</div>
+            <input type="file" id="file" style="margin-top:15px" accept="*">
+            <div class="tip">支持：txt、word、题目文本</div>
+        </div>
+        <button class="btn btn-success" onclick="readFile()">✅ 导入并生成题目</button>
+        <button class="btn btn-light" onclick="admin()">返回</button>
     </div>`;
 }
-function saveAdminQuestion(){
-    let type = document.getElementById("qType").value;
-    let content = document.getElementById("qContent").value;
-    let A = document.getElementById("optA").value;
-    let B = document.getElementById("optB").value;
-    let C = document.getElementById("optC").value;
-    let D = document.getElementById("optD").value;
-    let ans = document.getElementById("qAns").value;
-    if(!content||!ans)return alert("题目和答案不能为空！");
-    questions.push({
-        id:Date.now(),paper_id:nowPaperId,
-        subject:papers.find(x=>x.id===nowPaperId).subject,
-        type:Number(type),content:content,
-        options:[A,B,C,D],answer:ans,image:tempImage||""
-    });
-    tempImage="";saveData();alert("出题成功！");adminManagePaper(nowPaperId);
+
+function readFile(){
+    let file=document.getElementById("file").files[0];
+    if(!file)return alert("请选择文件");
+    let reader=new FileReader();
+    reader.onload=function(e){
+        let text=e.target.result;
+        let lines=text.split(/\n/);
+        lines.forEach(line=>{
+            if(line.trim().length<3)return;
+            let arr=line.split(/\|/);
+            let type=1,title=arr[0]||"",a=arr[1]||"",b=arr[2]||"",c=arr[3]||"",d=arr[4]||"",ans=arr[5]||"";
+            questions.push({id:Date.now(),pid:nowPaperId,type,title,a,b,c,d,ans});
+        });
+        save();alert("✅ 导入完成，已自动生成所有题目！");admin();
+    }
+    reader.readAsText(file);
 }
 
-// ==========================
-// 批量导入 / 图片 / 用户 / 邀请码
-// ==========================
-function adminBatchImport(){app.innerHTML=`<div class="card"><div class="title">批量导入</div><div class="tip">格式：题型|题目|A|B|C|D|答案</div><textarea id="batchText"></textarea><button onclick="doBatch()">导入</button><button onclick="renderAdminMain()">返回</button></div>`;}
-function doBatch(){
-    let t=document.getElementById("batchText").value.trim();
-    if(!t)return;let p=papers.find(x=>x.id===nowPaperId);
-    t.split('\n').forEach(line=>{
-        let a=line.split('|');
-        questions.push({id:Date.now(),paper_id:nowPaperId,subject:p.subject,type:Number(a[0]),content:a[1],options:[a[2],a[3],a[4],a[5]],answer:a[6],image:""});
-    });
-    saveData();alert("导入成功");renderAdminMain();
-}
-function adminPicPage(){tempImage="";app.innerHTML=`<div class="card"><input type="file" accept="image/*" onchange="previewImg(event)"><button onclick="editPicQuestion()">下一步</button></div>`;}
-function previewImg(e){let f=new FileReader();f.onload=ev=>{tempImage=ev.target.result;};f.readAsDataURL(e.target.files[0]);}
-function editPicQuestion(){app.innerHTML=`<div class="card">${renderMathTools("qContent")}<textarea id="qContent"></textarea><input id="qAns" placeholder="答案"><button onclick="savePicQ()">保存</button></div>`;}
-function savePicQ(){questions.push({id:Date.now(),paper_id:prompt("试卷ID"),subject:"math",type:1,content:document.getElementById("qContent").value,options:[],answer:document.getElementById("qAns").value,image:tempImage});saveData();alert("成功");renderAdminMain();}
-function adminUserList(){let h=`<div class="card"><div class="title">用户管理</div>`;users.forEach(u=>{h+=`<div>${u.username} (${u.name})</div>`;});h+=`<button onclick="renderAdminMain()">返回</button></div>`;app.innerHTML=h;}
-function adminCreateInvite(){let code="INV"+Math.random().toString().slice(-6);CODE_CONFIG[code]={days:365};alert("邀请码："+code);renderAdminMain();}
-function exportAllData(){alert("导出成功！");}
-
-renderHome();
+home();
 </script>
 </body>
 </html>
