@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>大湾区全科 - 中小学智能刷题平台</title>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         *{margin:0;padding:0;box-sizing:border-box;font-family:"PingFang SC","Microsoft YaHei",sans-serif}
         body{
@@ -70,6 +71,8 @@
         .btn-warning{background:#f59e0b}
         .btn-danger{background:#f43f5e}
         .btn-light{background:#eff6ff;color:#3282f0}
+        .btn-vip{background:#9333ea}
+        .btn-pay{background:#07c160}
         .input{
             width:100%;
             padding:16px 18px;
@@ -99,6 +102,7 @@
         .tag-season{background:#8b5cf6}
         .tag-year{background:#22c580}
         .tag-vip{background:#f59e0b}
+        .tag-seed{background:#9333ea}
         .subject-grid{
             display:grid;
             grid-template-columns:1fr 1fr 1fr;
@@ -179,370 +183,548 @@
             color:#fff;
         }
         .hide{display:none}
+        .select{
+            width:100%;
+            padding:16px;
+            border-radius:18px;
+            border:1px solid #d1e5ff;
+            margin:10px 0;
+            font-size:15px;
+            background:#fafbff;
+        }
+        #chart{
+            width:100%!important;
+            height:220px!important;
+            margin:20px 0;
+        }
+        .order-item{
+            background:#f8fafc;
+            border-radius:12px;
+            padding:12px;
+            margin:8px 0;
+            font-size:14px;
+        }
+        .qrcode{
+            width:200px;
+            height:200px;
+            margin:20px auto;
+            display:block;
+            border-radius:12px;
+        }
     </style>
 </head>
 <body>
 <div class="container" id="app"></div>
 <script>
-const ADMIN_PASS = "aweds123";
-const WECHAT = "475589411";
-const PAY_QR = "wx.png";
+const ADMIN_PASS = "yzw19990120";
+const WECHAT_GROUP = "扫码加入大湾区全科家长群";
+// 你的收款二维码（替换成你自己的微信/支付宝二维码图片链接）
+const PAY_QRCODE = "wx.png";
 
-const CODE_CONFIG = {
-    "tiyan2026":{name:"体验会员",days:1},
-    "yue2026":{name:"月会员",days:30},
-    "ji2026":{name:"季会员",days:90},
-    "nian2026":{name:"年会员",days:365},
-    "VIP999":{name:"永久会员",days:99999}
-};
+// 普通付费套餐
+const PACKAGES = [
+  {name:"体验会员",days:1,price:9.9},
+  {name:"月会员",days:30,price:38},
+  {name:"季会员",days:90,price:68},
+  {name:"年会员",days:365,price:128},
+  {name:"永久会员",days:99999,price:199}
+];
+
+// 地区 + 年级
+const AREAS = ["中山","广州","深圳","东莞","佛山","珠海","惠州"];
+const GRADES = ["一年级","二年级","三年级","四年级","五年级","六年级","初一","初二","初三"];
 
 let users = JSON.parse(localStorage.getItem("users")) || [];
 let papers = JSON.parse(localStorage.getItem("papers")) || [];
 let questions = JSON.parse(localStorage.getItem("questions")) || [];
 let wrongBooks = JSON.parse(localStorage.getItem("wrongBooks")) || [];
 let examHistory = JSON.parse(localStorage.getItem("examHistory")) || [];
+let codes = JSON.parse(localStorage.getItem("codes")) || []; // 普通一次性邀请码
+let seedCodes = JSON.parse(localStorage.getItem("seedCodes")) || []; // 种子永久邀请码
+let orders = JSON.parse(localStorage.getItem("orders")) || []; // 新增：订单记录
 
 let currentUser = null;
 let nowPaperId = 0;
-let tempImg = "";
 let editQid = null;
 
 const MATH = [
-    {n:"×",v:"\\times"},{n:"÷",v:"\\div"},
-    {n:"½",v:"\\frac{1}{2}"},{n:"√",v:"\\sqrt{}"},{n:"²",v:"^2"},{n:"π",v:"\\pi"}
+  {n:"×",v:"\\times"},{n:"÷",v:"\\div"},
+  {n:"½",v:"\\frac{1}{2}"},{n:"√",v:"\\sqrt{}"},{n:"²",v:"^2"},{n:"π",v:"\\pi"}
 ];
 
+// 工具函数
 function insert(id,v){document.getElementById(id).value += "$"+v+"$";}
 function mathBar(id){
-    let h='<div class="math-bar">';
-    MATH.forEach(m=>{h+=`<button class="math-btn" onclick="insert('${id}','${m.v}')">${m.n}</button>`;});
-    return h+'</div>';
+  let h='<div class="math-bar">';
+  MATH.forEach(m=>{h+=`<button class="math-btn" onclick="insert('${id}','${m.v}')">${m.n}</button>`;});
+  return h+'</div>';
 }
 function save(){
-    localStorage.setItem("users",JSON.stringify(users));
-    localStorage.setItem("papers",JSON.stringify(papers));
-    localStorage.setItem("questions",JSON.stringify(questions));
-    localStorage.setItem("wrongBooks",JSON.stringify(wrongBooks));
-    localStorage.setItem("examHistory",JSON.stringify(examHistory));
+  localStorage.setItem("users",JSON.stringify(users));
+  localStorage.setItem("papers",JSON.stringify(papers));
+  localStorage.setItem("questions",JSON.stringify(questions));
+  localStorage.setItem("wrongBooks",JSON.stringify(wrongBooks));
+  localStorage.setItem("examHistory",JSON.stringify(examHistory));
+  localStorage.setItem("codes",JSON.stringify(codes));
+  localStorage.setItem("seedCodes",JSON.stringify(seedCodes));
+  localStorage.setItem("orders",JSON.stringify(orders)); // 保存订单
 }
 function day(){return Math.floor(Date.now()/86400000);}
+function randCode(){return Math.random().toString(36).substring(2,8).toUpperCase();}
 
-// ========== 首页 ==========
-function home(){
-    app.innerHTML=`
-    <div class="card">
-        <div class="title">大湾区全科</div>
-        <div class="sub-title">中小学智能刷题学习平台</div>
-        <button class="btn" onclick="login()">学生登录</button>
-        <button class="btn" onclick="reg()">注册账号</button>
-        <button class="btn btn-light" onclick="adminLogin()">教师后台</button>
-    </div>`;
+// 全局过期校验
+function checkUserExpire() {
+  if (!currentUser) return false;
+  if(currentUser.vipType === "种子家长永久会员") return true;
+  const today = day();
+  const expireDay = currentUser.regDay + currentUser.validDays;
+  if (today > expireDay) {
+    alert("你的会员已到期，请续费后再使用！");
+    currentUser = null;
+    home();
+    return false;
+  }
+  return true;
 }
 
-// ========== 登录 ==========
+// 首页
+function home(){
+  app.innerHTML=`
+  <div class="card">
+    <div class="title">大湾区全科</div>
+    <div class="sub-title">中小学智能刷题学习平台</div>
+    <button class="btn" onclick="login()">学生登录</button>
+    <button class="btn" onclick="reg()">注册账号</button>
+    <button class="btn btn-warning" onclick="pay()">立即开通会员</button>
+    <button class="btn btn-light" onclick="adminLogin()">教师后台</button>
+  </div>`;
+}
+
+// 登录
 function login(){
-    app.innerHTML=`
-    <div class="card">
-        <div class="title">学生登录</div>
-        <input class="input" id="u" placeholder="账号">
-        <input class="input" id="p" type="password" placeholder="密码">
-        <button class="btn" onclick="loginGo()">登录</button>
-        <button class="btn btn-light" onclick="home()">返回</button>
-    </div>`;
+  app.innerHTML=`
+  <div class="card">
+    <div class="title">学生登录</div>
+    <input class="input" id="u" placeholder="账号">
+    <input class="input" id="p" type="password" placeholder="密码">
+    <button class="btn" onclick="loginGo()">登录</button>
+    <button class="btn btn-light" onclick="home()">返回</button>
+  </div>`;
 }
 function loginGo(){
-    let u = document.getElementById("u").value;
-    let p = document.getElementById("p").value;
-    let user = users.find(x=>x.username==u&&x.password==p);
-    if(!user)return alert("账号或密码错误");
-    let expire = user.regDay + user.validDays;
-    if(day()>expire)return alert("会员已到期");
-    currentUser = user;
-    student();
+  let u = document.getElementById("u").value;
+  let p = document.getElementById("p").value;
+  let user = users.find(x=>x.username==u&&x.password==p);
+  if(!user){alert("账号或密码错误");return;}
+  if(user.vipType !== "种子家长永久会员"){
+    const today = day();
+    const expireDay = user.regDay + user.validDays;
+    if (today > expireDay) {
+      alert("你的会员已到期，请续费后再使用！");
+      return;
+    }
+  }
+  currentUser = user;
+  student();
 }
 
-// ========== 注册 ==========
+// 注册
 function reg(){
-    app.innerHTML=`
-    <div class="card">
-        <div class="title">注册</div>
-        <input class="input" id="ru" placeholder="账号">
-        <input class="input" id="rp" placeholder="密码">
-        <input class="input" id="rn" placeholder="姓名">
-        <input class="input" id="rc" placeholder="邀请码">
-        <button class="btn" onclick="regGo()">注册</button>
-        <button class="btn btn-light" onclick="home()">返回</button>
-    </div>`;
+  let areaOpts = AREAS.map(a=>`<option value="${a}">${a}</option>`).join("");
+  let gradeOpts = GRADES.map(g=>`<option value="${g}">${g}</option>`).join("");
+  app.innerHTML=`
+  <div class="card">
+    <div class="title">注册</div>
+    <input class="input" id="ru" placeholder="账号">
+    <input class="input" id="rp" placeholder="密码">
+    <input class="input" id="rn" placeholder="姓名">
+    <select class="select" id="rarea">${areaOpts}</select>
+    <select class="select" id="rgrade">${gradeOpts}</select>
+    <input class="input" id="rc" placeholder="输入开通邀请码">
+    <button class="btn" onclick="regGo()">注册</button>
+    <button class="btn btn-light" onclick="home()">返回</button>
+  </div>`;
 }
 function regGo(){
-    let u=document.getElementById("ru").value,p=document.getElementById("rp").value;
-    let n=document.getElementById("rn").value,c=document.getElementById("rc").value;
-    if(!u||!p||!n||!c)return alert("请完整填写");
-    if(!CODE_CONFIG[c])return alert("邀请码无效");
-    users.push({
-        username:u,password:p,name:n,
-        regDay:day(),validDays:CODE_CONFIG[c].days,
-        vipType:CODE_CONFIG[c].name
-    });
+  let u=document.getElementById("ru").value;
+  let p=document.getElementById("rp").value;
+  let n=document.getElementById("rn").value;
+  let area=document.getElementById("rarea").value;
+  let grade=document.getElementById("rgrade").value;
+  let c=document.getElementById("rc").value;
+  if(!u||!p||!n||!c){alert("请完整填写");return;}
+  let isSeed = seedCodes.find(x=>x.code==c);
+  if(isSeed){
+    users.push({username:u,password:p,name:n,area,grade,regDay:day(),validDays:99999,vipType:"种子家长永久会员"});
     save();
-    alert("注册成功！");
+    alert("注册成功！永久免费使用\n"+WECHAT_GROUP);
     login();
+    return;
+  }
+  let code = codes.find(x=>x.code==c&&x.used==false);
+  if(!code){alert("邀请码无效或已使用");return;}
+  code.used = true;
+  users.push({username:u,password:p,name:n,area,grade,regDay:day(),validDays:code.days,vipType:code.name});
+  save();
+  alert("注册成功！\n"+WECHAT_GROUP);
+  login();
 }
 
-// ========== 学生中心（V2.0全新） ==========
+// 付费页面（显示收款码+生成邀请码+记录订单）
+function pay(){
+  let list = PACKAGES.map((p,i)=>`
+  <div class="stat-box">
+    <div class="stat-row"><span>${p.name}</span><span>¥${p.price}</span></div>
+    <button class="btn btn-pay" onclick="payConfirm(${i})">扫码支付开通</button>
+  </div>`).join("");
+  app.innerHTML=`
+  <div class="card">
+    <div class="title">开通会员</div>
+    <div class="sub-title">扫码支付，费用直接到商家账户</div>
+    <img src="${PAY_QRCODE}" class="qrcode" alt="收款二维码">
+    ${list}
+    <button class="btn btn-light" onclick="home()">返回</button>
+  </div>`;
+}
+// 支付确认（生成邀请码+保存订单）
+function payConfirm(index){
+  let pkg = PACKAGES[index];
+  let code = randCode();
+  // 保存订单
+  orders.push({
+    id:Date.now(),
+    time:new Date().toLocaleString(),
+    package:pkg.name,
+    price:pkg.price,
+    code:code,
+    used:false
+  });
+  // 保存邀请码
+  codes.push({code:code,name:pkg.name,days:pkg.days,used:false});
+  save();
+  alert(`✅ 支付成功（费用已到商家账户）！
+你的开通邀请码：【${code}】
+请复制后前往注册！
+${WECHAT_GROUP}`);
+  home();
+}
+
+// 学生中心
 function student(){
-    let expire = currentUser.regDay + currentUser.validDays;
-    let left = expire - day();
-    app.innerHTML=`
-    <div class="card">
-        <div class="title">你好，${currentUser.name}</div>
-        <div style="text-align:center;margin-bottom:20px">
-            <span class="tag ${currentUser.vipType.includes("体验")?"tag-test":
-              currentUser.vipType.includes("月")?"tag-month":
-              currentUser.vipType.includes("季")?"tag-season":
-              currentUser.vipType.includes("年")?"tag-year":"tag-vip"}">
-                ${currentUser.vipType}
-            </span>
-            <div style="font-size:13px;color:#666;margin-top:8px">剩余 ${left} 天</div>
-        </div>
-        <div class="subject-grid">
-            <div class="subject-item" onclick="examList('math')">数学</div>
-            <div class="subject-item" onclick="examList('chinese')">语文</div>
-            <div class="subject-item" onclick="examList('english')">英语</div>
-        </div>
-        <button class="btn btn-success" onclick="myData()">📊 学习数据</button>
-        <button class="btn btn-warning" onclick="showWrong()">📕 错题本</button>
-        <button class="btn btn-light" onclick="home()">退出登录</button>
-    </div>`;
+  if (!checkUserExpire()) return;
+  let expire = currentUser.regDay + currentUser.validDays;
+  let left = expire - day();
+  let tagClass = currentUser.vipType==="种子家长永久会员"?"tag-seed":
+  currentUser.vipType.includes("体验")?"tag-test":
+  currentUser.vipType.includes("月")?"tag-month":
+  currentUser.vipType.includes("季")?"tag-season":
+  currentUser.vipType.includes("年")?"tag-year":"tag-vip";
+  app.innerHTML=`
+  <div class="card">
+    <div class="title">你好，${currentUser.name}</div>
+    <div style="text-align:center;margin-bottom:10px">
+      <span class="tag">${currentUser.area} | ${currentUser.grade}</span>
+      <span class="tag ${tagClass}">${currentUser.vipType}</span>
+      <div style="font-size:13px;color:#666;margin-top:8px">
+        ${currentUser.vipType==="种子家长永久会员"?"永久免费使用":"剩余 "+left+" 天"}
+      </div>
+    </div>
+    <div class="subject-grid">
+      <div class="subject-item" onclick="examList('math')">数学</div>
+      <div class="subject-item" onclick="examList('chinese')">语文</div>
+      <div class="subject-item" onclick="examList('english')">英语</div>
+    </div>
+    <button class="btn btn-success" onclick="myData()">📊 学习数据图表</button>
+    <button class="btn btn-warning" onclick="showWrong()">📕 错题本</button>
+    <button class="btn btn-light" onclick="home()">退出登录</button>
+  </div>`;
 }
 
-// ========== 学习数据（V2.0新增） ==========
+// 学习数据图表
 function myData(){
-    let myRecord = examHistory.filter(x=>x.user==currentUser.username);
-    let total = myRecord.length;
-    let scoreSum = 0;
-    myRecord.forEach(x=>{scoreSum+=x.score});
-    let avg = total>0 ? (scoreSum/total).toFixed(1) : 0;
-    let wrongNum = wrongBooks.filter(x=>x.user==currentUser.username).length;
-
-    app.innerHTML=`
-    <div class="card">
-        <div class="title">学习数据</div>
-        <div class="stat-box">
-            <div class="stat-row"><span>做题次数</span><span>${total}</span></div>
-            <div class="stat-row"><span>平均得分</span><span>${avg} 分</span></div>
-            <div class="stat-row"><span>错题数量</span><span>${wrongNum} 题</span></div>
-        </div>
-        <button class="btn btn-light" onclick="student()">返回</button>
-    </div>`;
+  if (!checkUserExpire()) return;
+  let myRecord = examHistory.filter(x=>x.user == currentUser.username);
+  let total = myRecord.length;
+  let scoreSum = 0;
+  myRecord.forEach(x=>{scoreSum+=x.score});
+  let avg = total>0 ? (scoreSum/total).toFixed(1) : 0;
+  let wrongNum = wrongBooks.filter(x=>x.user == currentUser.username).length;
+  let labels = myRecord.map((_,i)=>`第${i+1}次`);
+  let scores = myRecord.map(x=>x.score);
+  app.innerHTML=`
+  <div class="card">
+    <div class="title">学习数据</div>
+    <canvas id="chart"></canvas>
+    <div class="stat-box">
+      <div class="stat-row"><span>做题次数</span><span>${total}</span></div>
+      <div class="stat-row"><span>平均得分</span><span>${avg} 分</span></div>
+      <div class="stat-row"><span>错题数量</span><span>${wrongNum} 题</span></div>
+    </div>
+    <button class="btn btn-light" onclick="student()">返回</button>
+  </div>`;
+  new Chart(document.getElementById("chart"),{
+    type:"line",
+    data:{labels:labels,datasets:[{label:"成绩",data:scores,borderColor:"#3282f0",backgroundColor:"rgba(50,130,240,0.1)"}]},
+    options:{responsive:true,maintainAspectRatio:false}
+  });
 }
 
-// ========== 题库列表 ==========
+// 题库列表
 function examList(sub){
-    let list = papers.filter(x=>x.sub==sub);
-    let h=`<div class="card"><div class="title">${sub=="math"?"数学":sub=="chinese"?"语文":"英语"}题库</div>`;
-    list.forEach(p=>{h+=`<button class="btn" onclick="startExam(${p.id})">${p.title}</button>`;});
-    h+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
-    app.innerHTML=h;
+  if (!checkUserExpire()) return;
+  let list = papers.filter(p=>p.sub==sub && p.area==currentUser.area && p.grade==currentUser.grade);
+  let h=`<div class="card"><div class="title">${sub=="math"?"数学":sub=="chinese"?"语文":"英语"}</div>`;
+  if(list.length===0) h+=`<div style="text-align:center;padding:20px;color:#666">暂无试卷</div>`;
+  list.forEach(p=>{h+=`<button class="btn" onclick="startExam(${p.id})">${p.title}</button>`;});
+  h+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
+  app.innerHTML=h;
 }
 
-// ========== 开始答题 ==========
+// 答题
 function startExam(pid){
-    nowPaperId = pid;
-    let qs = questions.filter(x=>x.pid==pid);
-    let h=`<div class="card"><div class="title">开始答题</div>`;
-    qs.forEach((q,i)=>{
-        h+=`<div style="margin:20px 0"><b>${i+1}.</b> <span class="mj-parse">${q.content}</span></div>`;
-        if(q.type==1){
-            h+=`<label><input type="radio" name="q${i}" value="A"> A. ${q.op[0]}</label>
-            <label><input type="radio" name="q${i}" value="B"> B. ${q.op[1]}</label>
-            <label><input type="radio" name="q${i}" value="C"> C. ${q.op[2]}</label>
-            <label><input type="radio" name="q${i}" value="D"> D. ${q.op[3]}</label>`;
-        }
-        if(q.type==3){
-            h+=`<label><input type="radio" name="q${i}" value="对"> 对</label>
-            <label><input type="radio" name="q${i}" value="错"> 错</label>`;
-        }
-        if(q.type==4){
-            h+=`<input class="input" id="q${i}" placeholder="请输入答案">`;
-        }
-    });
-    h+=`<button class="btn btn-success" onclick="submitExam(${pid})">提交试卷</button></div>`;
-    app.innerHTML=h;MathJax.typeset();
+  if (!checkUserExpire()) return;
+  nowPaperId = pid;
+  let qs = questions.filter(x=>x.pid==pid);
+  let h=`<div class="card"><div class="title">开始答题</div>`;
+  qs.forEach((q,i)=>{
+    h+=`<div style="margin:20px 0"><b>${i+1}.</b> <span class="mj-parse">${q.content}</span></div>`;
+    if(q.type==1){
+      h+=`<label><input type="radio" name="q${i}" value="A"> A. ${q.op[0]}</label>
+      <label><input type="radio" name="q${i}" value="B"> B. ${q.op[1]}</label>
+      <label><input type="radio" name="q${i}" value="C"> C. ${q.op[2]}</label>
+      <label><input type="radio" name="q${i}" value="D"> D. ${q.op[3]}</label>`;
+    }
+    if(q.type==3){
+      h+=`<label><input type="radio" name="q${i}" value="对"> 对</label>
+      <label><input type="radio" name="q${i}" value="错"> 错</label>`;
+    }
+    if(q.type==4){
+      h+=`<input class="input" id="q${i}" placeholder="请输入答案">`;
+    }
+  });
+  h+=`<button class="btn btn-success" onclick="submitExam(${pid})">提交试卷</button></div>`;
+  app.innerHTML=h; MathJax.typeset();
 }
 
-// ========== 交卷评分 ==========
 function submitExam(pid){
-    let qs = questions.filter(x=>x.pid==pid);
-    let score=0;let wrong=[];
-    qs.forEach((q,i)=>{
-        let v="";
-        if(q.type==1||q.type==3){
-            let r=document.querySelector(`input[name="q${i}"]:checked`);
-            v=r?r.value:"";
-        }else v=document.getElementById(`q${i}`).value.trim();
-        if(v==q.answer)score++;
-        else wrong.push({...q,user:currentUser.username});
-    });
-    examHistory.push({
-        user:currentUser.username,
-        score:score,total:qs.length,
-        time:new Date().toLocaleString()
-    });
-    wrongBooks.push(...wrong);
-    save();
-    alert(`完成！得分：${score}/${qs.length}`);
-    student();
+  if (!checkUserExpire()) return;
+  let qs = questions.filter(x=>x.pid==pid);
+  let score=0; let wrong=[];
+  qs.forEach((q,i)=>{
+    let v="";
+    if(q.type==1||q.type==3){
+      let r=document.querySelector(`input[name="q${i}"]:checked`);
+      v=r?r.value:"";
+    }else{
+      v=document.getElementById(`q${i}`).value.trim();
+    }
+    if(v==q.answer) score++;
+    else wrong.push({...q,user:currentUser.username});
+  });
+  examHistory.push({user:currentUser.username,score:score,total:qs.length,time:new Date().toLocaleString()});
+  wrongBooks.push(...wrong);
+  save();
+  alert(`提交成功！得分：${score}/${qs.length}`);
+  student();
 }
 
-// ========== 错题本 ==========
+// 错题本
 function showWrong(){
-    let list = wrongBooks.filter(x=>x.user==currentUser.username);
-    let h=`<div class="card"><div class="title">我的错题本</div>`;
-    list.forEach(q=>{h+=`<div style="padding:12px 0;border-bottom:1px solid #eee"><span class="mj-parse">${q.content}</span></div>`;});
-    h+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
-    app.innerHTML=h;MathJax.typeset();
+  if (!checkUserExpire()) return;
+  let list = wrongBooks.filter(x=>x.user == currentUser.username);
+  let h=`<div class="card"><div class="title">我的错题本</div>`;
+  list.forEach(q=>{h+=`<div style="padding:12px 0;border-bottom:1px solid #eee"><span class="mj-parse">${q.content}</span></div>`;});
+  h+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
+  app.innerHTML=h; MathJax.typeset();
 }
 
-// ========== 教师后台 ==========
+// 教师后台
 function adminLogin(){
-    app.innerHTML=`
-    <div class="card">
-        <div class="title">教师后台</div>
-        <input class="input" id="pwd" type="password" placeholder="管理员密码">
-        <button class="btn" onclick="if(document.getElementById('pwd').value==ADMIN_PASS)admin()">登录</button>
-    </div>`;
+  app.innerHTML=`
+  <div class="card">
+    <div class="title">教师后台</div>
+    <input class="input" id="pwd" type="password" placeholder="管理员密码">
+    <button class="btn" onclick="checkAdmin()">登录</button>
+    <button class="btn btn-light" onclick="home()">返回</button>
+  </div>`;
+}
+function checkAdmin(){
+  if(document.getElementById("pwd").value===ADMIN_PASS) admin();
+  else alert("密码错误");
 }
 function admin(){
-    app.innerHTML=`
-    <div class="card">
-        <div class="title">管理中心</div>
-        <button class="btn" onclick="addPaper()">新建试卷</button>
-        <button class="btn" onclick="paperList()">管理题库</button>
-        <button class="btn" onclick="userList()">用户管理</button>
-        <button class="btn" onclick="showCodes()">邀请码</button>
-        <button class="btn btn-light" onclick="home()">退出</button>
-    </div>`;
+  app.innerHTML=`
+  <div class="card">
+    <div class="title">管理中心</div>
+    <button class="btn" onclick="addPaper()">新建试卷（地区+年级）</button>
+    <button class="btn" onclick="paperList()">管理题库</button>
+    <button class="btn" onclick="userList()">用户管理</button>
+    <button class="btn" onclick="codeList()">普通邀请码管理</button>
+    <button class="btn" onclick="orderList()">💰 订单/收费统计</button>
+    <button class="btn btn-vip" onclick="createSeedCode()">生成种子家长永久邀请码</button>
+    <button class="btn btn-light" onclick="home()">退出</button>
+  </div>`;
 }
 
-// ========== 试卷管理 ==========
+// 订单/收费统计（新增核心功能）
+function orderList(){
+  let totalIncome = orders.reduce((sum,o)=>sum+o.price,0).toFixed(2);
+  let totalOrders = orders.length;
+  let list = orders.map(o=>`
+  <div class="order-item">
+    <div>时间：${o.time}</div>
+    <div>套餐：${o.package}</div>
+    <div>金额：¥${o.price}</div>
+    <div>邀请码：${o.code}</div>
+    <div>状态：${o.used?"已使用":"未使用"}</div>
+  </div>`).join("");
+  app.innerHTML=`
+  <div class="card">
+    <div class="title">💰 收费统计 & 订单明细</div>
+    <div class="stat-box">
+      <div class="stat-row"><span>总收入</span><span>¥${totalIncome}</span></div>
+      <div class="stat-row"><span>订单总数</span><span>${totalOrders}</span></div>
+    </div>
+    <div style="margin:15px 0;font-weight:bold">订单列表</div>
+    ${list||"<div style='text-align:center;color:#666'>暂无订单</div>"}
+    <button class="btn btn-light" onclick="admin()">返回</button>
+  </div>`;
+}
+
+// 生成种子家长永久邀请码
+function createSeedCode(){
+  let code = randCode();
+  seedCodes.push({code:code});
+  save();
+  alert(`✅ 已生成种子家长永久邀请码：
+【${code}】
+可无限次给种子家长注册，永久免费使用！`);
+  admin();
+}
+
+// 新建试卷
 function addPaper(){
-    let title=prompt("试卷名称");
-    if(!title)return;
-    let sub=prompt("科目：math/chinese/english");
-    papers.push({id:Date.now(),title:title,sub:sub});
-    save();paperList();
+  let a = AREAS.map(x=>`<option value="${x}">${x}</option>`).join("");
+  let g = GRADES.map(x=>`<option value="${x}">${x}</option>`).join("");
+  app.innerHTML=`
+  <div class="card">
+    <div class="title">新建试卷</div>
+    <input class="input" id="title" placeholder="试卷名称">
+    <select class="select" id="sub">
+      <option value="math">数学</option>
+      <option value="chinese">语文</option>
+      <option value="english">英语</option>
+    </select>
+    <select class="select" id="area">${a}</select>
+    <select class="select" id="grade">${g}</select>
+    <button class="btn" onclick="savePaper()">创建</button>
+  </div>`;
 }
-function paperList(){
-    let h=`<div class="card"><div class="title">试卷列表</div>`;
-    papers.forEach(p=>{h+=`<button class="btn" onclick="goPaper(${p.id})">${p.title}</button>`;});
-    h+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;
-    app.innerHTML=h;
+function savePaper(){
+  let title = document.getElementById("title").value;
+  let sub = document.getElementById("sub").value;
+  let area = document.getElementById("area").value;
+  let grade = document.getElementById("grade").value;
+  if(!title)return;
+  papers.push({id:Date.now(),title,sub,area,grade});
+  save(); paperList();
 }
 
-// ========== 出题 ==========
+// 试卷列表
+function paperList(){
+  let h=`<div class="card"><div class="title">试卷列表</div>`;
+  papers.forEach(p=>{h+=`<button class="btn" onclick="goPaper(${p.id})">${p.area} ${p.grade} | ${p.title}</button>`;});
+  h+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;
+  app.innerHTML=h;
+}
+
+// 出题中心
 function goPaper(pid){
-    nowPaperId=pid;editQid=null;
-    let qs=questions.filter(x=>x.pid==pid);
-    let h=`
-    <div class="card">
-        <div class="title">出题中心</div>
-        <div class="tab">
-            <button onclick="tab(1)" id="t1" class="active">单选</button>
-            <button onclick="tab(3)" id="t3">判断</button>
-            <button onclick="tab(4)" id="t4">填空</button>
-        </div>
-        <div id="m1">
-            ${mathBar("c1")}
-            <textarea class="input" id="c1" placeholder="题目"></textarea>
-            <input class="input" id="a1" placeholder="A">
-            <input class="input" id="b1" placeholder="B">
-            <input class="input" id="c1i" placeholder="C">
-            <input class="input" id="d1" placeholder="D">
-            <input class="input" id="ans1" placeholder="答案">
-        </div>
-        <div id="m3" class="hide">
-            ${mathBar("c3")}
-            <textarea class="input" id="c3" placeholder="题目"></textarea>
-            <input class="input" id="ans3" placeholder="对/错">
-        </div>
-        <div id="m4" class="hide">
-            ${mathBar("c4")}
-            <textarea class="input" id="c4" placeholder="题目"></textarea>
-            <input class="input" id="ans4" placeholder="答案">
-        </div>
-        <button class="btn btn-success" onclick="saveQ()">保存题目</button>
-        <div style="margin:20px 0;font-weight:bold">题目列表</div>`;
-    qs.forEach(q=>{
-        h+=`
-        <div class="q-item">
-            <span class="mj-parse">${q.content}</span>
-            <div class="q-btns">
-                <button class="item-edit" onclick="editQ(${q.id})">修改</button>
-                <button class="item-del" onclick="delQ(${q.id})">删除</button>
-            </div>
-        </div>`;
-    });
-    h+=`<button class="btn btn-light" onclick="paperList()">返回</button></div>`;
-    app.innerHTML=h;MathJax.typeset();
+  nowPaperId=pid; editQid=null;
+  let qs=questions.filter(x=>x.pid==pid);
+  let h=`
+  <div class="card">
+    <div class="title">出题中心</div>
+    <div class="tab">
+      <button onclick="tab(1)" id="t1" class="active">单选</button>
+      <button onclick="tab(3)" id="t3">判断</button>
+      <button onclick="tab(4)" id="t4">填空</button>
+    </div>
+    <div id="m1">${mathBar("c1")}<textarea class="input" id="c1" placeholder="题目"></textarea>
+    <input class="input" id="a1" placeholder="A"><input class="input" id="b1" placeholder="B">
+    <input class="input" id="c1i" placeholder="C"><input class="input" id="d1" placeholder="D">
+    <input class="input" id="ans1" placeholder="答案"></div>
+    <div id="m3" class="hide">${mathBar("c3")}<textarea class="input" id="c3" placeholder="题目"></textarea>
+    <input class="input" id="ans3" placeholder="对/错"></div>
+    <div id="m4" class="hide">${mathBar("c4")}<textarea class="input" id="c4" placeholder="题目"></textarea>
+    <input class="input" id="ans4" placeholder="答案"></div>
+    <button class="btn btn-success" onclick="saveQ()">保存题目</button>
+    <div style="margin:20px 0;font-weight:bold">题目列表</div>`;
+  qs.forEach(q=>{h+=`<div class="q-item"><span class="mj-parse">${q.content}</span><div class="q-btns"><button class="item-edit" onclick="editQ(${q.id})">修改</button><button class="item-del" onclick="delQ(${q.id})">删除</button></div></div>`;});
+  h+=`<button class="btn btn-light" onclick="paperList()">返回</button></div>`;
+  app.innerHTML=h; MathJax.typeset();
 }
+
 function tab(n){
-    document.querySelectorAll("#m1,#m3,#m4").forEach(x=>x.classList.add("hide"));
-    document.querySelectorAll(".tab button").forEach(x=>x.classList.remove("active"));
-    document.getElementById("m"+n).classList.remove("hide");
-    document.getElementById("t"+n).classList.add("active");
+  document.querySelectorAll("#m1,#m3,#m4").forEach(x=>x.classList.add("hide"));
+  document.querySelectorAll(".tab button").forEach(x=>x.classList.remove("active"));
+  document.getElementById("m"+n).classList.remove("hide");
+  document.getElementById("t"+n).classList.add("active");
 }
+
 function saveQ(){
-    let t=document.querySelector(".tab button.active").innerText;
-    let content,op=[],ans,type=1;
-    if(t.includes("单")){
-        type=1; content=document.getElementById("c1").value;
-        op=[document.getElementById("a1").value,document.getElementById("b1").value,document.getElementById("c1i").value,document.getElementById("d1").value];
-        ans=document.getElementById("ans1").value;
-    }
-    if(t.includes("判")){type=3; content=document.getElementById("c3").value; ans=document.getElementById("ans3").value;}
-    if(t.includes("填")){type=4; content=document.getElementById("c4").value; ans=document.getElementById("ans4").value;}
-    if(!content||!ans)return alert("不能为空");
-    if(editQid)questions=questions.filter(x=>x.id!=editQid);
-    questions.push({id:Date.now(),pid:nowPaperId,type:type,content:content,op:op,answer:ans});
-    save();goPaper(nowPaperId);
+  let t = document.querySelector(".tab button.active").innerText;
+  let content,op=[],ans,type=1;
+  if(t.includes("单")){
+    type=1; content=document.getElementById("c1").value;
+    op=[document.getElementById("a1").value,document.getElementById("b1").value,document.getElementById("c1i").value,document.getElementById("d1").value];
+    ans=document.getElementById("ans1").value;
+  }
+  if(t.includes("判")){type=3; content=document.getElementById("c3").value; ans=document.getElementById("ans3").value;}
+  if(t.includes("填")){type=4; content=document.getElementById("c4").value; ans=document.getElementById("ans4").value;}
+  if(!content||!ans){alert("不能为空");return;}
+  if(editQid) questions = questions.filter(x=>x.id!=editQid);
+  questions.push({id:Date.now(),pid:nowPaperId,type,content,op,answer:ans});
+  save(); goPaper(nowPaperId);
 }
+
 function editQ(id){
-    editQid=id;let q=questions.find(x=>x.id==id);
-    if(q.type==1){tab(1);document.getElementById("c1").value=q.content;
-    document.getElementById("a1").value=q.op[0];document.getElementById("b1").value=q.op[1];
-    document.getElementById("c1i").value=q.op[2];document.getElementById("d1").value=q.op[3];
-    document.getElementById("ans1").value=q.answer;}
-    if(q.type==3){tab(3);document.getElementById("c3").value=q.content;document.getElementById("ans3").value=q.answer;}
-    if(q.type==4){tab(4);document.getElementById("c4").value=q.content;document.getElementById("ans4").value=q.answer;}
+  editQid=id; let q=questions.find(x=>x.id==id);
+  if(q.type==1){tab(1);document.getElementById("c1").value=q.content;document.getElementById("a1").value=q.op[0];document.getElementById("b1").value=q.op[1];document.getElementById("c1i").value=q.op[2];document.getElementById("d1").value=q.op[3];document.getElementById("ans1").value=q.answer;}
+  if(q.type==3){tab(3);document.getElementById("c3").value=q.content;document.getElementById("ans3").value=q.answer;}
+  if(q.type==4){tab(4);document.getElementById("c4").value=q.content;document.getElementById("ans4").value=q.answer;}
 }
+
 function delQ(id){if(!confirm("确定删除？"))return;questions=questions.filter(x=>x.id!=id);save();goPaper(nowPaperId);}
 
-// ========== 用户管理（V2.0） ==========
+// 用户管理
 function userList(){
-    let h=`<div class="card"><div class="title">用户管理</div>`;
-    users.forEach((u,i)=>{
-        let l = u.regDay+u.validDays-day();
-        h+=`
-        <div class="user-item">
-            ${u.name} @${u.username}<br>
-            ${u.vipType} | 剩余 ${l} 天<br>
-            <button class="btn-danger" style="width:auto;padding:6px 10px;margin-top:8px" onclick="delUser(${i})">删除</button>
-        </div>`;
-    });
-    h+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;
-    app.innerHTML=h;
+  let h=`<div class="card"><div class="title">用户管理</div>`;
+  users.forEach((u,i)=>{
+    let l = u.regDay+u.validDays-day();
+    h+=`<div class="user-item">
+    ${u.name} | ${u.area} ${u.grade}<br>
+    ${u.vipType} | ${u.vipType=="种子家长永久会员"?"永久有效":"剩余"+l+"天"}
+    <button class="btn-danger" style="width:auto;padding:6px;margin-top:6px" onclick="delUser(${i})">删除</button>
+    </div>`;
+  });
+  h+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;
+  app.innerHTML=h;
 }
 function delUser(i){if(!confirm("确定删除？"))return;users.splice(i,1);save();userList();}
 
-// ========== 邀请码 ==========
-function showCodes(){
-    alert(`邀请码列表：
-体验：tiyan2026
-月卡：yue2026
-季卡：ji2026
-年卡：nian2026
-永久：VIP999`);
+// 普通邀请码管理
+function codeList(){
+  let list = codes.map(c=>`
+  <div class="stat-box">
+    ${c.code} | ${c.name} | ${c.used?"已使用":"未使用"}
+  </div>`).join("");
+  app.innerHTML=`
+  <div class="card">
+    <div class="title">普通邀请码列表</div>
+    ${list||"<div style='text-align:center;color:#666'>暂无邀请码</div>"}
+    <button class="btn btn-light" onclick="admin()">返回</button>
+  </div>`;
 }
 
 home();
