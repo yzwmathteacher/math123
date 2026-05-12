@@ -12,7 +12,8 @@
         .container{max-width:560px;margin:auto;}
         .card{background:#fff;border-radius:16px;padding:20px;margin:12px 0;box-shadow:0 2px 10px rgba(0,0,0,0.06);}
         .title{font-size:20px;font-weight:bold;color:#2563eb;text-align:center;margin-bottom:12px;}
-        .sub-title{color:#666;font-size:14px;text-align:center;margin-bottom:12px;}
+        .sub-title{color:#666;font-size:14px;text-align:center;margin-bottom:12px;line-height:1.5}
+        .tip{background:#fffbeb;color:#d97706;border:1px solid #fcd34d;border-radius:10px;padding:12px;margin:10px 0;font-size:14px;}
         .btn{width:100%;padding:12px;border:none;border-radius:12px;margin:8px 0;font-size:15px;background:#2563eb;color:#fff;cursor:pointer;}
         .btn-success{background:#10b981;}
         .btn-warning{background:#f59e0b;}
@@ -23,14 +24,15 @@
         .item{background:#f9fafb;border-radius:10px;padding:12px;margin:8px 0;}
         label{display:block;margin:6px 0;}
         textarea.input{min-height:120px;resize:none;}
+        .chart-box{height:250px;margin:15px 0;}
     </style>
 </head>
 <body>
 <div class="container" id="app"></div>
 
 <script>
-const ADMIN_PASS = "yzw19990120";
-const PAY_QRCODE = "wx.png";
+const ADMIN_PASS = "123456";
+const PAY_QRCODE ="wx.png";
 
 const PACKAGES = [
   {name:"体验会员",days:1,price:9.9},
@@ -152,20 +154,24 @@ function regGo(){
   save();alert("注册成功！");login();
 }
 
-// ===================== 付费开通 =====================
+// ===================== 【升级1】家长开通会员（强引导） =====================
 function payPage(){
   let list = PACKAGES.map((o,i)=>`
   <div class="item">
     <div>${o.name}  ¥${o.price}</div>
-    <button class="btn btn-success" onclick="goPay(${i})">选择</button>
+    <button class="btn btn-success" onclick="goPay(${i})">选择套餐</button>
   </div>`).join("");
 
   app.innerHTML=`
   <div class="card">
     <div class="title">开通会员</div>
+    <div class="tip">
+      📌 开通流程（必看）<br>
+      1. 选择套餐 → 2. 扫码付款 → 3. 提交信息 → 4. 管理员审核 → 5. 获取邀请码
+    </div>
     <img src="${PAY_QRCODE}" class="qrcode">
     ${list}
-    <button class="btn btn-light" onclick="checkPayStatus()">查看审核进度</button>
+    <button class="btn btn-light" onclick="checkPayStatus()">查看我的审核进度</button>
     <button class="btn btn-light" onclick="home()">返回</button>
   </div>`;
 }
@@ -174,11 +180,12 @@ function goPay(i){
   let pkg = PACKAGES[i];
   app.innerHTML=`
   <div class="card">
-    <div class="title">提交付款</div>
-    <div class="sub-title">${pkg.name} ¥${pkg.price}</div>
+    <div class="title">提交付款信息</div>
+    <div class="sub-title">套餐：${pkg.name} 价格：¥${pkg.price}</div>
+    <div class="tip">请先完成付款，再提交信息</div>
     <input class="input" id="nick" placeholder="家长姓名">
     <input class="input" id="phone" placeholder="联系电话">
-    <button class="btn" onclick="submitPay(${i})">提交审核</button>
+    <button class="btn" onclick="submitPay(${i})">确认提交，等待审核</button>
     <button class="btn btn-light" onclick="payPage()">返回</button>
   </div>`;
 }
@@ -186,26 +193,29 @@ function goPay(i){
 function submitPay(i){
   let nick = document.getElementById("nick").value.trim();
   let phone = document.getElementById("phone").value.trim();
-  if(!nick) return alert("请填写姓名");
+  if(!nick) return alert("请填写家长姓名");
   payApplys.push({
     id:Date.now(),nick,phone,pkg:PACKAGES[i].name,
     price:PACKAGES[i].price,days:PACKAGES[i].days,
     status:"pending",code:"",time:new Date().toLocaleString()
   });
-  save();alert("提交成功，请等待审核");payPage();
+  save();alert("提交成功！请等待管理员审核");payPage();
 }
 
 function checkPayStatus(){
   let my = payApplys.filter(x=>x.nick==document.getElementById("nick")?.value);
   let html = `<div class="card"><div class="title">审核进度</div>`;
   my.forEach(x=>{
-    html+=`<div class="item">${x.pkg} ${x.status=="pending"?"等待审核":"✅ 通过，邀请码："+x.code}</div>`;
+    html+=`<div class="item">
+      <div>套餐：${x.pkg}</div>
+      <div>状态：${x.status=="pending"?"⏳等待审核":"✅已通过，邀请码："+x.code}</div>
+    </div>`;
   });
   html+=`<button class="btn btn-light" onclick="payPage()">返回</button></div>`;
   app.innerHTML=html;
 }
 
-// ===================== 学生中心 =====================
+// ===================== 【升级2】学生中心 + 【升级3】折线统计图 =====================
 function student(){
   if(!checkUserExpire()) return;
   let left = currentUser.regDay+currentUser.validDays-day();
@@ -214,10 +224,46 @@ function student(){
     <div class="title">您好，${currentUser.name}</div>
     <div class="sub-title">${currentUser.area} ${currentUser.grade} | 剩余${left}天</div>
     <button class="btn" onclick="examList('math')">开始刷题</button>
-    <button class="btn btn-success" onclick="myRecord()">学习记录</button>
+    <button class="btn btn-success" onclick="showMyChart()">📈 我的学习进步曲线</button>
     <button class="btn btn-warning" onclick="myWrong()">错题本</button>
     <button class="btn btn-light" onclick="home()">退出</button>
   </div>`;
+}
+
+// 学习记录 + 折线图
+function showMyChart(){
+  let records = examHistory.filter(x=>x.user==currentUser.username).slice(-8);
+  if(records.length==0) return alert("暂无练习记录，请先刷题");
+
+  let html = `
+  <div class="card">
+    <div class="title">学习进步趋势</div>
+    <div class="chart-box"><canvas id="scoreChart"></canvas></div>`;
+  
+  records.forEach(r=>{
+    html+=`<div class="item">${r.time}  得分：${r.score}/${r.total}</div>`;
+  });
+  html+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
+  app.innerHTML = html;
+
+  setTimeout(()=>{
+    let ctx = document.getElementById("scoreChart").getContext("2d");
+    new Chart(ctx,{
+      type:"line",
+      data:{
+        labels:records.map((_,i)=>"第"+(i+1)+"次"),
+        datasets:[{
+          label:"得分",
+          data:records.map(x=>x.score),
+          borderColor:"#2563eb",
+          backgroundColor:"rgba(59,130,246,0.2)",
+          tension:0.3,
+          fill:true
+        }]
+      },
+      options:{responsive:true,maintainAspectRatio:false}
+    });
+  },100);
 }
 
 function examList(sub){
@@ -253,19 +299,15 @@ function submitExam(){
     if(ans==q.answer) score++;
     else wrong.push({...q,user:currentUser.username});
   });
-  examHistory.push({user:currentUser.username,score,total:qs.length,time:new Date().toLocaleString()});
+  examHistory.push({
+    user:currentUser.username,
+    score:score, total:qs.length,
+    time:new Date().toLocaleString()
+  });
   wrongBooks.push(...wrong);
   save();
-  alert(`完成！得分：${score}/${qs.length}`);
+  alert(`提交成功！得分：${score}/${qs.length}`);
   student();
-}
-
-function myRecord(){
-  let list = examHistory.filter(x=>x.user==currentUser.username);
-  let html = `<div class="card"><div class="title">学习记录</div>`;
-  list.forEach(x=>html+=`<div class="item">${x.time}  ${x.score}/${x.total}</div>`);
-  html+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
-  app.innerHTML=html;
 }
 
 function myWrong(){
@@ -311,7 +353,7 @@ function checkPay(){
   list.forEach(x=>{
     html+=`<div class="item">
       <div>${x.nick} ${x.pkg} ¥${x.price}</div>
-      <button class="btn btn-success" onclick="passPay(${x.id})">通过并发卡</button>
+      <button class="btn btn-success" onclick="passPay(${x.id})">通过并发邀请码</button>
     </div>`;
   });
   html+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;
@@ -333,7 +375,7 @@ function makeSeed(){
   save();alert("永久邀请码："+code);admin();
 }
 
-// ===================== 试卷导入 =====================
+// 试卷导入
 function importPaper(){
   app.innerHTML=`
   <div class="card">
@@ -407,7 +449,7 @@ function savePaper(){
   save();alert("保存成功！");admin();
 }
 
-// ===================== 题库管理（可修改） =====================
+// 题库管理
 function managePaper(){
   let html = `<div class="card"><div class="title">题库管理</div>`;
   papers.forEach(p=>{
