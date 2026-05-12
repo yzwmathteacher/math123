@@ -286,7 +286,47 @@ function examList(sub){
   h+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
   app.innerHTML=h;
 }
-function startExam(pid){alert("原有答题功能保留，后台可正常出题使用");student();}
+// 学生答题功能（已修复）
+function startExam(pid){
+  // 先校验会员状态
+  if (!checkUserExpire()) return;
+  nowPaperId = pid;
+  let qs = questions.filter(x=>x.pid==pid);
+  let h=`<div class="card"><div class="title">开始答题</div>`;
+  qs.forEach((q,i)=>{
+    h+=`<div style="margin:20px 0"><b>${i+1}.</b> <span class="mj-parse">${q.content}</span></div>`;
+    if(q.type==1){
+      h+=`<label><input type="radio" name="q${i}" value="A"> A. ${q.op[0]}</label>
+      <label><input type="radio" name="q${i}" value="B"> B. ${q.op[1]}</label>
+      <label><input type="radio" name="q${i}" value="C"> C. ${q.op[2]}</label>
+      <label><input type="radio" name="q${i}" value="D"> D. ${q.op[3]}</label>`;
+    }
+  });
+  h+=`<button class="btn btn-success" onclick="submitExam(${pid})">提交试卷</button></div>`;
+  app.innerHTML=h; MathJax.typeset();
+}
+
+// 提交试卷、统计成绩、错题本功能
+function submitExam(pid){
+  if (!checkUserExpire()) return;
+  let qs = questions.filter(x=>x.pid==pid);
+  let score=0; let wrong=[];
+  qs.forEach((q,i)=>{
+    let r=document.querySelector(`input[name="q${i}"]:checked`);
+    let v=r?r.value:"";
+    if(v==q.answer) score++;
+    else wrong.push({...q,user:currentUser.username});
+  });
+  examHistory.push({
+    user:currentUser.username,
+    score:score, total:qs.length,
+    time:new Date().toLocaleString()
+  });
+  wrongBooks.push(...wrong);
+  save();
+  alert(`提交成功！得分：${score}/${qs.length}`);
+  student();
+}
 function myData(){alert("学习数据功能正常保留");student();}
 function showWrong(){alert("错题本功能正常保留");student();}
 
