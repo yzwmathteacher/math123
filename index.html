@@ -26,17 +26,15 @@
         .q-edit-item{border-bottom:1px solid #eee;padding:12px 0;}
         .hide{display:none;}
         textarea.input{min-height:100px;resize:vertical;}
+        label{display:block;margin:6px 0;font-size:15px;}
     </style>
 </head>
 <body>
 <div class="container" id="app"></div>
 <script>
 const ADMIN_PASS = "yzw19990120";
-const WECHAT_GROUP = "扫码加入大湾区全科家长群";
-// 本地同目录收款码
 const PAY_QRCODE = "wx.png";
 
-// 套餐配置
 const PACKAGES = [
   {name:"体验会员",days:1,price:9.9},
   {name:"月会员",days:30,price:38},
@@ -47,7 +45,6 @@ const PACKAGES = [
 const AREAS = ["中山","广州","深圳","东莞","佛山","珠海","惠州"];
 const GRADES = ["一年级","二年级","三年级","四年级","五年级","六年级","初一","初二","初三"];
 
-// 本地存储数据
 let users = JSON.parse(localStorage.getItem("users")) || [];
 let papers = JSON.parse(localStorage.getItem("papers")) || [];
 let questions = JSON.parse(localStorage.getItem("questions")) || [];
@@ -55,18 +52,11 @@ let wrongBooks = JSON.parse(localStorage.getItem("wrongBooks")) || [];
 let examHistory = JSON.parse(localStorage.getItem("examHistory")) || [];
 let codes = JSON.parse(localStorage.getItem("codes")) || [];
 let seedCodes = JSON.parse(localStorage.getItem("seedCodes")) || [];
-// 付费申请记录
 let payApplys = JSON.parse(localStorage.getItem("payApplys")) || [];
 
 let currentUser = null;
 let nowPaperId = 0;
-let editQid = null;
 let tempImportQs = [];
-
-const MATH = [
-  {n:"×",v:"\\times"},{n:"÷",v:"\\div"},{n:"½",v:"\\frac{1}{2}"},
-  {n:"√",v:"\\sqrt{}"},{n:"²",v:"^2"},{n:"π",v:"\\pi"}
-];
 
 function save(){
   localStorage.setItem("users",JSON.stringify(users));
@@ -81,7 +71,6 @@ function save(){
 function day(){return Math.floor(Date.now()/86400000);}
 function randCode(){return Math.random().toString(36).substring(2,8).toUpperCase();}
 
-// 过期校验
 function checkUserExpire() {
   if (!currentUser) return false;
   if(currentUser.vipType === "种子家长永久会员") return true;
@@ -93,7 +82,6 @@ function checkUserExpire() {
   return true;
 }
 
-// 首页
 function home(){
   app.innerHTML=`
   <div class="card">
@@ -154,13 +142,11 @@ function regGo(){
   let c=document.getElementById("rc").value.trim();
   if(!u||!p||!n||!c){alert("请填写完整信息");return;}
 
-  // 种子永久码
   let seed = seedCodes.find(x=>x.code==c);
   if(seed){
     users.push({username:u,password:p,name:n,area,grade,regDay:day(),validDays:99999,vipType:"种子家长永久会员"});
     save();alert("注册成功，永久免费使用！");login();return;
   }
-  // 普通邀请码
   let code = codes.find(x=>x.code==c&&x.used==false);
   if(!code){alert("邀请码无效或已使用");return;}
   code.used = true;
@@ -168,7 +154,7 @@ function regGo(){
   save();alert("注册成功！");login();
 }
 
-// 家长付费页面（仅展示收款码+提交申请，不自动发码）
+// 付费流程
 function payPage(){
   let list = PACKAGES.map((item,idx)=>`
   <div class="apply-item">
@@ -186,7 +172,6 @@ function payPage(){
   </div>`;
 }
 
-// 填写付款申请信息
 function showPayApply(idx){
   let pkg = PACKAGES[idx];
   app.innerHTML=`
@@ -200,61 +185,43 @@ function showPayApply(idx){
   </div>`;
 }
 
-// 提交付费申请到后台
 function submitPayApply(idx){
   let pkg = PACKAGES[idx];
   let nick = document.getElementById("nick").value.trim();
   let phone = document.getElementById("phone").value.trim();
   if(!nick){alert("请填写昵称/姓名");return;}
-  // 生成申请记录
   let apply = {
-    id:Date.now(),
-    nick,
-    phone,
-    packageName:pkg.name,
-    price:pkg.price,
-    days:pkg.days,
-    code:"",
-    status:"pending", // pending待审核 pass已通过
-    time:new Date().toLocaleString()
+    id:Date.now(),nick,phone,
+    packageName:pkg.name,price:pkg.price,days:pkg.days,
+    code:"",status:"pending",time:new Date().toLocaleString()
   };
   payApplys.push(apply);
   save();
-  alert("提交成功！请等待管理员审核，审核通过后在此页面查看邀请码");
+  alert("提交成功！等待管理员审核");
   checkPayResult();
 }
 
-// 家长查看审核结果 & 领取邀请码
 function checkPayResult(){
   let pending = payApplys.filter(x=>x.status=="pending");
   let pass = payApplys.filter(x=>x.status=="pass");
-  let html = `
-  <div class="card">
-    <div class="title">审核进度查询</div>`;
+  let html = `<div class="card"><div class="title">审核进度查询</div>`;
   if(pass.length>0){
     pass.forEach(item=>{
       html += `
       <div class="apply-item" style="border:1px solid #22c580">
         <div>套餐：${item.packageName}</div>
-        <div>状态：✅ 审核已通过</div>
+        <div>✅ 审核已通过</div>
         <div>你的邀请码：<b style="color:red">${item.code}</b></div>
-        <div>请复制邀请码去注册账号</div>
       </div>`;
     });
   }
-  if(pending.length>0){
-    pending.forEach(item=>{
-      html += `
-      <div class="apply-item">
-        <div>套餐：${item.packageName}</div>
-        <div>提交时间：${item.time}</div>
-        <div>状态：⏳ 等待管理员审核</div>
-      </div>`;
-    });
-  }
-  if(payApplys.length==0){
-    html += `<div class="sub-title">暂无付款记录</div>`;
-  }
+  pending.forEach(item=>{
+    html += `
+    <div class="apply-item">
+      <div>套餐：${item.packageName}</div>
+      <div>⏳ 等待审核</div>
+    </div>`;
+  });
   html += `<button class="btn btn-light" onclick="payPage()">返回</button></div>`;
   app.innerHTML = html;
 }
@@ -268,45 +235,43 @@ function student(){
     <div class="title">你好，${currentUser.name}</div>
     <div class="sub-title">${currentUser.area} ${currentUser.grade} | ${currentUser.vipType} ${currentUser.vipType=="种子家长永久会员"?"永久有效":"剩余"+left+"天"}</div>
     <button class="btn btn-primary" onclick="examList('math')">数学刷题</button>
-    <button class="btn btn-primary" onclick="examList('chinese')">语文刷题</button>
-    <button class="btn btn-primary" onclick="examList('english')">英语刷题</button>
-    <button class="btn btn-success" onclick="myData()">学习数据统计</button>
-    <button class="btn btn-warning" onclick="showWrong()">我的错题本</button>
+    <button class="btn btn-success" onclick="myData()">学习数据</button>
+    <button class="btn btn-warning" onclick="showWrong()">错题本</button>
     <button class="btn btn-light" onclick="home()">退出登录</button>
   </div>`;
 }
 
-// 题库、答题、错题本、数据图表 省略不变（保留原有逻辑）
 function examList(sub){
   if(!checkUserExpire())return;
   let list = papers.filter(p=>p.sub==sub&&p.area==currentUser.area&&p.grade==currentUser.grade);
-  let h=`<div class="card"><div class="title">${sub=="math"?"数学":sub=="chinese"?"语文":"英语"}题库</div>`;
-  if(list.length==0)h+=`<div class="sub-title">暂无对应试卷</div>`;
+  let h=`<div class="card"><div class="title">数学题库</div>`;
+  if(list.length==0)h+=`<div class="sub-title">暂无试卷</div>`;
   list.forEach(p=>h+=`<button class="btn btn-primary" onclick="startExam(${p.id})">${p.title}</button>`);
   h+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
   app.innerHTML=h;
 }
-// 学生答题功能（已修复）
+
+// ========== 学生正常答题功能（已修复） ==========
 function startExam(pid){
-  // 先校验会员状态
   if (!checkUserExpire()) return;
   nowPaperId = pid;
   let qs = questions.filter(x=>x.pid==pid);
   let h=`<div class="card"><div class="title">开始答题</div>`;
   qs.forEach((q,i)=>{
-    h+=`<div style="margin:20px 0"><b>${i+1}.</b> <span class="mj-parse">${q.content}</span></div>`;
+    h+=`<div style="margin:20px 0;font-weight:bold;">${i+1}. ${q.content}</div>`;
     if(q.type==1){
-      h+=`<label><input type="radio" name="q${i}" value="A"> A. ${q.op[0]}</label>
+      h+=`
+      <label><input type="radio" name="q${i}" value="A"> A. ${q.op[0]}</label>
       <label><input type="radio" name="q${i}" value="B"> B. ${q.op[1]}</label>
       <label><input type="radio" name="q${i}" value="C"> C. ${q.op[2]}</label>
-      <label><input type="radio" name="q${i}" value="D"> D. ${q.op[3]}</label>`;
+      <label><input type="radio" name="q${i}" value="D"> D. ${q.op[3]}</label>
+      `;
     }
   });
   h+=`<button class="btn btn-success" onclick="submitExam(${pid})">提交试卷</button></div>`;
-  app.innerHTML=h; MathJax.typeset();
+  app.innerHTML=h;
 }
 
-// 提交试卷、统计成绩、错题本功能
 function submitExam(pid){
   if (!checkUserExpire()) return;
   let qs = questions.filter(x=>x.pid==pid);
@@ -327,8 +292,26 @@ function submitExam(pid){
   alert(`提交成功！得分：${score}/${qs.length}`);
   student();
 }
-function myData(){alert("学习数据功能正常保留");student();}
-function showWrong(){alert("错题本功能正常保留");student();}
+
+function myData(){
+  let myRecords = examHistory.filter(x=>x.user==currentUser.username);
+  let h=`<div class="card"><div class="title">学习数据</div>`;
+  myRecords.forEach(r=>{
+    h+=`<div class="apply-item">${r.time}  得分：${r.score}/${r.total}</div>`;
+  });
+  h+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
+  app.innerHTML=h;
+}
+
+function showWrong(){
+  let myWrong = wrongBooks.filter(x=>x.user==currentUser.username);
+  let h=`<div class="card"><div class="title">错题本</div>`;
+  myWrong.forEach((q,i)=>{
+    h+=`<div style="margin:10px 0">${i+1}. ${q.content}</div>`;
+  });
+  h+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
+  app.innerHTML=h;
+}
 
 // ========== 教师后台 ==========
 function adminLogin(){
@@ -348,77 +331,65 @@ function adminIndex(){
   app.innerHTML=`
   <div class="card">
     <div class="title">教师管理中心</div>
-    <button class="btn btn-warning" onclick="adminPayApply()">💰 待付费审核列表</button>
-    <button class="btn btn-primary" onclick="addPaper()">新建试卷</button>
-    <button class="btn btn-primary" onclick="importTxtPaper()">📄 TXT试卷导入</button>
+    <button class="btn btn-warning" onclick="adminPayApply()">💰 待付费审核</button>
+    <button class="btn btn-primary" onclick="importTxtPaper()">📄 试卷导入</button>
     <button class="btn btn-primary" onclick="paperList()">题库管理</button>
     <button class="btn btn-primary" onclick="userList()">用户管理</button>
-    <button class="btn btn-vip" onclick="createSeedCode()">生成种子永久邀请码</button>
+    <button class="btn btn-vip" onclick="createSeedCode()">生成永久邀请码</button>
     <button class="btn btn-light" onclick="home()">退出后台</button>
   </div>`;
 }
 
-// 后台：付费申请审核列表
+// 付费审核
 function adminPayApply(){
   let pending = payApplys.filter(x=>x.status=="pending");
-  let html = `<div class="card"><div class="title">待付费审核列表</div>`;
-  if(pending.length===0){
-    html += `<div class="sub-title">暂无待审核付款申请</div>`;
-  }
+  let html = `<div class="card"><div class="title">待审核付款</div>`;
   pending.forEach(item=>{
     html += `
     <div class="apply-item">
       <div>昵称：${item.nick}</div>
-      <div>手机：${item.phone||"未填写"}</div>
-      <div>套餐：${item.packageName} | 金额：¥${item.price}</div>
-      <div>提交时间：${item.time}</div>
-      <button class="btn btn-success" onclick="passPayApply(${item.id})">已到账，审核通过并下发邀请码</button>
+      <div>套餐：${item.packageName}  ¥${item.price}</div>
+      <button class="btn btn-success" onclick="passPayApply(${item.id})">已到账，下发邀请码</button>
     </div>`;
   });
   html += `<button class="btn btn-light" onclick="adminIndex()">返回</button></div>`;
   app.innerHTML = html;
 }
 
-// 审核通过，自动生成邀请码下发
 function passPayApply(id){
   let item = payApplys.find(x=>x.id==id);
   if(!item)return;
   let code = randCode();
-  // 存入普通邀请码
   codes.push({code:code,name:item.packageName,days:item.days,used:false});
-  // 绑定到申请记录
   item.status = "pass";
   item.code = code;
   save();
-  alert("审核通过！已自动生成邀请码，家长可在开通页面查看");
+  alert("已通过，邀请码已下发！");
   adminPayApply();
 }
 
-// 生成种子永久邀请码
 function createSeedCode(){
   let code = randCode();
   seedCodes.push({code:code});
   save();
-  alert("种子家长永久邀请码："+code+"\n可无限次注册，永久免费");
+  alert("永久邀请码："+code);
   adminIndex();
 }
 
-// TXT试卷导入功能
+// 试卷导入
 function importTxtPaper(){
   app.innerHTML=`
   <div class="card">
     <div class="title">TXT试卷导入</div>
-    <div class="sub-title">Word另存为纯文本TXT，粘贴下方文本框</div>
-    <textarea class="input" id="txtContent" placeholder="粘贴TXT全部内容"></textarea>
+    <textarea class="input" id="txtContent" placeholder="粘贴纯文本试卷"></textarea>
     <button class="btn btn-primary" onclick="parseTxtQuestion()">解析题目</button>
     <button class="btn btn-light" onclick="adminIndex()">返回</button>
   </div>`;
 }
-// 解析TXT题目
+
 function parseTxtQuestion(){
   let text = document.getElementById("txtContent").value;
-  if(!text){alert("请粘贴试卷内容");return;}
-  // 简单解析单选判断
+  if(!text){alert("请粘贴内容");return;}
   let lines = text.split("\n").map(l=>l.trim()).filter(l=>l);
   tempImportQs = [];
   let type = 1;
@@ -426,7 +397,6 @@ function parseTxtQuestion(){
   let opt = [];
   for(let line of lines){
     if(line.includes("【单选】")){type=1;continue;}
-    if(line.includes("【判断】")){type=3;continue;}
     if(/^\d+\./.test(line)){
       if(title){
         tempImportQs.push({type,content:title,op:[...opt],answer:""});
@@ -438,89 +408,70 @@ function parseTxtQuestion(){
     }
   }
   if(title) tempImportQs.push({type,content:title,op:[...opt],answer:""});
-  alert("解析完成，共"+tempImportQs.length+"道题，请逐题修改并填写答案");
+  alert("解析完成："+tempImportQs.length+"题");
   showEditImportQ();
 }
 
-// 编辑导入的题目
 function showEditImportQ(){
-  let html = `<div class="card"><div class="title">编辑导入题目（可改数字、题干、填答案）</div>`;
+  let html = `<div class="card"><div class="title">编辑题目 & 填写答案</div>`;
   tempImportQs.forEach((q,idx)=>{
     html += `
     <div class="q-edit-item">
-      <div>第${idx+1}题 ${q.type==1?"单选":"判断"}</div>
+      <div>第${idx+1}题</div>
       <input class="input" id="qtitle${idx}" value="${q.content}">
-      ${q.type==1?`
-      <input class="input" id="qa${idx}" placeholder="A选项" value="${q.op[0]||''}">
-      <input class="input" id="qb${idx}" placeholder="B选项" value="${q.op[1]||''}">
-      <input class="input" id="qc${idx}" placeholder="C选项" value="${q.op[2]||''}">
-      <input class="input" id="qd${idx}" placeholder="D选项" value="${q.op[3]||''}">
-      `:""}
-      <input class="input" id="qans${idx}" placeholder="填写正确答案" value="${q.answer}">
+      <input class="input" id="qa${idx}" placeholder="A" value="${q.op[0]||''}">
+      <input class="input" id="qb${idx}" placeholder="B" value="${q.op[1]||''}">
+      <input class="input" id="qc${idx}" placeholder="C" value="${q.op[2]||''}">
+      <input class="input" id="qd${idx}" placeholder="D" value="${q.op[3]||''}">
+      <input class="input" id="qans${idx}" placeholder="答案：A/B/C/D">
     </div>`;
   });
   html += `
-  <select class="input" id="saveSub">
-    <option value="math">数学</option>
-    <option value="chinese">语文</option>
-    <option value="english">英语</option>
-  </select>
-  <select class="input" id="saveArea">
-    ${AREAS.map(a=>`<option value="${a}">${a}</option>`).join("")}
-  </select>
-  <select class="input" id="saveGrade">
-    ${GRADES.map(g=>`<option value="${g}">${g}</option>`).join("")}
-  </select>
-  <input class="input" id="paperTitle" placeholder="填写试卷名称">
-  <button class="btn btn-success" onclick="saveImportPaper()">保存为整套试卷</button>
+  <select class="input" id="saveSub"><option value="math">数学</option></select>
+  <select class="input" id="saveArea">${AREAS.map(a=>`<option value="${a}">${a}</option>`).join("")}</select>
+  <select class="input" id="saveGrade">${GRADES.map(g=>`<option value="${g}">${g}</option>`).join("")}</select>
+  <input class="input" id="paperTitle" placeholder="试卷名称">
+  <button class="btn btn-success" onclick="saveImportPaper()">保存入库</button>
   <button class="btn btn-light" onclick="adminIndex()">返回</button></div>`;
   app.innerHTML = html;
 }
 
-// 保存导入题目为正式试卷
 function saveImportPaper(){
   let paperTitle = document.getElementById("paperTitle").value.trim();
   let sub = document.getElementById("saveSub").value;
   let area = document.getElementById("saveArea").value;
   let grade = document.getElementById("saveGrade").value;
-  if(!paperTitle){alert("请填写试卷名称");return;}
-  // 新建试卷
+  if(!paperTitle){alert("请填写试卷名");return;}
   let pid = Date.now();
   papers.push({id:pid,title:paperTitle,sub,area,grade});
-  // 保存修改后的题目
   tempImportQs.forEach((q,idx)=>{
     let content = document.getElementById("qtitle"+idx).value.trim();
     let ans = document.getElementById("qans"+idx).value.trim();
-    let op = [];
-    if(q.type==1){
-      op = [
-        document.getElementById("qa"+idx).value.trim(),
-        document.getElementById("qb"+idx).value.trim(),
-        document.getElementById("qc"+idx).value.trim(),
-        document.getElementById("qd"+idx).value.trim()
-      ];
-    }
-    questions.push({id:Date.now()+idx,pid,type:q.type,content,op,answer:ans});
+    let op = [
+      document.getElementById("qa"+idx).value.trim(),
+      document.getElementById("qb"+idx).value.trim(),
+      document.getElementById("qc"+idx).value.trim(),
+      document.getElementById("qd"+idx).value.trim()
+    ];
+    questions.push({id:Date.now()+idx,pid,type:1,content,op,answer:ans});
   });
   save();
-  alert("试卷保存成功，已入库！");
+  alert("试卷保存成功！");
   adminIndex();
 }
 
-// 其余后台原有功能保留
-function addPaper(){alert("原有新建试卷功能正常使用");adminIndex();}
-function paperList(){alert("题库管理功能正常使用");adminIndex();}
+function paperList(){
+  let h=`<div class="card"><div class="title">试卷列表</div>`;
+  papers.forEach(p=>h+=`<div class="apply-item">${p.title} ${p.area}${p.grade}</div>`);
+  h+=`<button class="btn btn-light" onclick="adminIndex()">返回</button></div>`;
+  app.innerHTML=h;
+}
+
 function userList(){
-  let html = `<div class="card"><div class="title">用户管理</div>`;
+  let html = `<div class="card"><div class="title">用户列表</div>`;
   users.forEach(u=>{
     let left = u.regDay+u.validDays-day();
-    html += `
-    <div class="apply-item">
-      <div>姓名：${u.name}</div>
-      <div>账号：${u.username}</div>
-      <div>年级：${u.area}${u.grade}</div>
-      <div>会员：${u.vipType} ${u.vipType=="种子家长永久会员"?"永久":"剩余"+left+"天"}</div>
-    </div>`;
+    html += `<div class="apply-item">${u.name} | ${u.area}${u.grade} | 剩余：${left}天</div>`;
   });
   html += `<button class="btn btn-light" onclick="adminIndex()">返回</button></div>`;
   app.innerHTML = html;
