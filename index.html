@@ -50,6 +50,7 @@ const PACKAGES = [
 const AREAS = ["中山","广州","深圳","东莞","佛山","珠海","惠州"];
 const GRADES = ["一年级","二年级","三年级","四年级","五年级","六年级","初一","初二","初三"];
 
+// 读取本地原有数据【你已建的试卷、题目全部保留】
 let users = JSON.parse(localStorage.getItem("users")) || [];
 let papers = JSON.parse(localStorage.getItem("papers")) || [];
 let questions = JSON.parse(localStorage.getItem("questions")) || [];
@@ -276,7 +277,7 @@ function examList(sub){
   app.innerHTML=html;
 }
 
-// 【重点】自动渲染单选/判断/填空三种作答UI
+// 三种题型渲染
 function startExam(pid){
   if(!checkUserExpire()) return;
   nowPaperId = pid;
@@ -302,7 +303,7 @@ function startExam(pid){
   app.innerHTML=html;
 }
 
-// 批改：三种题型统一判分
+// 阅卷判分
 function submitExam(){
   let qs = questions.filter(x=>x.pid==nowPaperId);
   let score=0,wrong=[];
@@ -337,7 +338,7 @@ function myWrong(){
   app.innerHTML=html;
 }
 
-// ===================== 教师后台 =====================
+// ===================== 教师后台【重点修改邀请码】 =====================
 function adminLogin(){
   app.innerHTML=`
   <div class="card">
@@ -360,12 +361,62 @@ function admin(){
     <button class="btn btn-success" onclick="singleAddQ()">手动新增题目【单选/判断/填空】</button>
     <button class="btn" onclick="managePaper()">题库管理/修改题目</button>
     <button class="btn" onclick="userManage()">用户管理</button>
-    <button class="btn btn-vip" onclick="makeSeed()">生成永久邀请码</button>
+    <button class="btn" onclick="createNormalCode()">生成套餐邀请码</button>
+    <button class="btn btn-vip" onclick="makeSeed()">生成种子永久邀请码</button>
     <button class="btn btn-light" onclick="home()">退出</button>
   </div>`;
 }
 
-// ========== 手动添加三种题型 ==========
+// ========== 新增：自选套餐生成普通邀请码 ==========
+function createNormalCode(){
+  let optHtml = PACKAGES.map((item,idx)=>`<option value="${idx}">${item.name}(${item.days}天)</option>`).join("");
+  app.innerHTML=`
+  <div class="card">
+    <div class="title">生成套餐邀请码</div>
+    <select class="input" id="selPkg">
+      ${optHtml}
+    </select>
+    <button class="btn btn-success" onclick="genOneCode()">生成单个邀请码</button>
+    <button class="btn btn-light" onclick="admin()">返回后台</button>
+  </div>`;
+}
+function genOneCode(){
+  let idx = Number(document.getElementById("selPkg").value);
+  let pkg = PACKAGES[idx];
+  let newCode = randCode();
+  codes.push({code:newCode,name:pkg.name,days:pkg.days,used:false});
+  save();
+  alert(`生成成功：${newCode}\n套餐：${pkg.name}，有效期${pkg.days}天`);
+  createNormalCode();
+}
+
+// 生成种子永久码（独立，只进seedCodes）
+function makeSeed(){
+  let code = randCode();
+  seedCodes.push({code});
+  save();
+  alert("种子永久邀请码："+code);admin();
+}
+
+// 付款审核通过自动生成对应套餐邀请码（不变）
+function checkPay(){
+  let list = payApplys.filter(x=>x.status=="pending");
+  let html = `<div class="card"><div class="title">待审核</div>`;
+  list.forEach(x=>{
+    html+=`<div class="item">${x.nick} ${x.pkg} ¥${x.price}<button class="btn btn-success" onclick="passPay(${x.id})">通过发码</button></div>`;
+  });
+  html+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;
+  app.innerHTML=html;
+}
+function passPay(id){
+  let item = payApplys.find(x=>x.id==id);
+  let code = randCode();
+  codes.push({code,name:item.pkg,days:item.days,used:false});
+  item.status="pass";item.code=code;save();
+  alert("已通过！邀请码："+code);checkPay();
+}
+
+// ========== 手动新增三种题型（不变） ==========
 function singleAddQ(){
   let paperOpt = papers.map(p=>`<option value="${p.id}">${p.title}【${p.area}${p.grade}】</option>`).join("");
   app.innerHTML=`
@@ -393,7 +444,6 @@ function singleAddQ(){
     <button class="btn btn-light" onclick="admin()">返回</button>
   </div>`;
 }
-
 function saveSingleQ(){
   let pid = document.getElementById("selPid").value;
   let type = Number(document.getElementById("qType").value);
@@ -410,7 +460,7 @@ function saveSingleQ(){
     if(!a||!b||!c||!d) return alert("单选四项选项必填");
     optArr=[a,b,c,d];
   }else{
-    optArr=["","","",""]; // 判断/填空不需要选项，占位
+    optArr=["","","",""];
   }
 
   questions.push({
@@ -426,28 +476,7 @@ function saveSingleQ(){
   singleAddQ();
 }
 
-function checkPay(){
-  let list = payApplys.filter(x=>x.status=="pending");
-  let html = `<div class="card"><div class="title">待审核</div>`;
-  list.forEach(x=>{
-    html+=`<div class="item">${x.nick} ${x.pkg} ¥${x.price}<button class="btn btn-success" onclick="passPay(${x.id})">通过发码</button></div>`;
-  });
-  html+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;
-  app.innerHTML=html;
-}
-function passPay(id){
-  let item = payApplys.find(x=>x.id==id);
-  let code = randCode();
-  codes.push({code,name:item.pkg,days:item.days,used:false});
-  item.status="pass";item.code=code;save();
-  alert("已通过！邀请码："+code);checkPay();
-}
-function makeSeed(){
-  let code = randCode();seedCodes.push({code});save();
-  alert("永久邀请码："+code);admin();
-}
-
-// 批量导入仅单选不变
+// 批量导入单选（原样不动）
 function importPaper(){
   app.innerHTML=`
   <div class="card">
