@@ -34,6 +34,11 @@
 const ADMIN_PASS = "awedsr134793";
 const PAY_QRCODE ="wx.png";
 
+// 题型常量 1单选 2判断 3填空
+const TYPE_SEL = 1;
+const TYPE_JUDGE = 2;
+const TYPE_BLANK = 3;
+
 const PACKAGES = [
   {name:"体验会员",days:1,price:9.9},
   {name:"月会员",days:30,price:38},
@@ -154,7 +159,7 @@ function regGo(){
   save();alert("注册成功！");login();
 }
 
-// ===================== 【升级1】家长开通会员（强引导） =====================
+// ===================== 开通会员 =====================
 function payPage(){
   let list = PACKAGES.map((o,i)=>`
   <div class="item">
@@ -203,7 +208,8 @@ function submitPay(i){
 }
 
 function checkPayStatus(){
-  let my = payApplys.filter(x=>x.nick==document.getElementById("nick")?.value);
+  let nickVal = document.getElementById("nick")?.value||"";
+  let my = payApplys.filter(x=>x.nick==nickVal);
   let html = `<div class="card"><div class="title">审核进度</div>`;
   my.forEach(x=>{
     html+=`<div class="item">
@@ -215,7 +221,7 @@ function checkPayStatus(){
   app.innerHTML=html;
 }
 
-// ===================== 【升级2】学生中心 + 【升级3】折线统计图 =====================
+// ===================== 学生主页、做题、图表、错题 =====================
 function student(){
   if(!checkUserExpire()) return;
   let left = currentUser.regDay+currentUser.validDays-day();
@@ -230,22 +236,18 @@ function student(){
   </div>`;
 }
 
-// 学习记录 + 折线图
 function showMyChart(){
   let records = examHistory.filter(x=>x.user==currentUser.username).slice(-8);
   if(records.length==0) return alert("暂无练习记录，请先刷题");
-
   let html = `
   <div class="card">
     <div class="title">学习进步趋势</div>
     <div class="chart-box"><canvas id="scoreChart"></canvas></div>`;
-  
   records.forEach(r=>{
     html+=`<div class="item">${r.time}  得分：${r.score}/${r.total}</div>`;
   });
   html+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
   app.innerHTML = html;
-
   setTimeout(()=>{
     let ctx = document.getElementById("scoreChart").getContext("2d");
     new Chart(ctx,{
@@ -257,8 +259,7 @@ function showMyChart(){
           data:records.map(x=>x.score),
           borderColor:"#2563eb",
           backgroundColor:"rgba(59,130,246,0.2)",
-          tension:0.3,
-          fill:true
+          tension:0.3,fill:true
         }]
       },
       options:{responsive:true,maintainAspectRatio:false}
@@ -275,33 +276,48 @@ function examList(sub){
   app.innerHTML=html;
 }
 
+// 【重点】自动渲染单选/判断/填空三种作答UI
 function startExam(pid){
   if(!checkUserExpire()) return;
   nowPaperId = pid;
   let qs = questions.filter(x=>x.pid==pid);
   let html = `<div class="card"><div class="title">开始答题</div>`;
   qs.forEach((q,i)=>{
-    html+=`<div style="margin:10px 0;font-weight:bold;">${i+1}. ${q.content}</div>`;
-    html+=`<label><input type="radio" name="q${i}" value="A"> A. ${q.op[0]}</label>`;
-    html+=`<label><input type="radio" name="q${i}" value="B"> B. ${q.op[1]}</label>`;
-    html+=`<label><input type="radio" name="q${i}" value="C"> C. ${q.op[2]}</label>`;
-    html+=`<label><input type="radio" name="q${i}" value="D"> D. ${q.op[3]}</label>`;
+    html+=`<div style="margin:12px 0;border-bottom:1px solid #eee;padding-bottom:10px;">`;
+    html+=`<div style="font-weight:bold;margin-bottom:6px;">${i+1}. ${q.content}</div>`;
+    if(q.type === TYPE_SEL){
+      html+=`<label><input type="radio" name="q${i}" value="A"> A. ${q.op[0]}</label>`;
+      html+=`<label><input type="radio" name="q${i}" value="B"> B. ${q.op[1]}</label>`;
+      html+=`<label><input type="radio" name="q${i}" value="C"> C. ${q.op[2]}</label>`;
+      html+=`<label><input type="radio" name="q${i}" value="D"> D. ${q.op[3]}</label>`;
+    }else if(q.type === TYPE_JUDGE){
+      html+=`<label><input type="radio" name="q${i}" value="对"> 正确</label>`;
+      html+=`<label><input type="radio" name="q${i}" value="错"> 错误</label>`;
+    }else if(q.type === TYPE_BLANK){
+      html+=`<input class="input" placeholder="填写答案" id="blank${i}">`;
+    }
+    html+=`</div>`;
   });
   html+=`<button class="btn btn-success" onclick="submitExam()">提交试卷</button></div>`;
   app.innerHTML=html;
 }
 
+// 批改：三种题型统一判分
 function submitExam(){
   let qs = questions.filter(x=>x.pid==nowPaperId);
   let score=0,wrong=[];
   qs.forEach((q,i)=>{
-    let ans = document.querySelector(`input[name="q${i}"]:checked`)?.value;
-    if(ans==q.answer) score++;
+    let userAns;
+    if(q.type===TYPE_SEL || q.type===TYPE_JUDGE){
+      userAns = document.querySelector(`input[name="q${i}"]:checked`)?.value||"";
+    }else{
+      userAns = document.getElementById("blank"+i)?.value.trim()||"";
+    }
+    if(userAns === q.answer) score++;
     else wrong.push({...q,user:currentUser.username});
   });
   examHistory.push({
-    user:currentUser.username,
-    score:score, total:qs.length,
+    user:currentUser.username,score:score,total:qs.length,
     time:new Date().toLocaleString()
   });
   wrongBooks.push(...wrong);
@@ -313,7 +329,10 @@ function submitExam(){
 function myWrong(){
   let list = wrongBooks.filter(x=>x.user==currentUser.username);
   let html = `<div class="card"><div class="title">错题本</div>`;
-  list.forEach((q,i)=>html+=`<div class="item">${i+1}. ${q.content}</div>`);
+  list.forEach((q,i)=>{
+    let typeName = q.type==1?"单选":q.type==2?"判断":"填空";
+    html+=`<div class="item">【${typeName}】${i+1}. ${q.content}<br>正确答案：${q.answer}</div>`;
+  });
   html+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
   app.innerHTML=html;
 }
@@ -323,172 +342,218 @@ function adminLogin(){
   app.innerHTML=`
   <div class="card">
     <div class="title">后台登录</div>
-    <input class="input" id="pwd" type="password" placeholder="密码：123456">
+    <input class="input" id="pwd" type="password" placeholder="密码">
     <button class="btn" onclick="checkAdmin()">登录</button>
     <button class="btn btn-light" onclick="home()">返回</button>
   </div>`;
 }
-
 function checkAdmin(){
   if(document.getElementById("pwd").value==ADMIN_PASS) admin();
   else alert("密码错误");
 }
-
 function admin(){
   app.innerHTML=`
   <div class="card">
     <div class="title">管理后台</div>
     <button class="btn btn-warning" onclick="checkPay()">付款审核</button>
-    <button class="btn" onclick="importPaper()">试卷导入</button>
-    <button class="btn" onclick="managePaper()">题库管理</button>
+    <button class="btn" onclick="importPaper()">批量文本导入试卷(仅单选)</button>
+    <button class="btn btn-success" onclick="singleAddQ()">手动新增题目【单选/判断/填空】</button>
+    <button class="btn" onclick="managePaper()">题库管理/修改题目</button>
     <button class="btn" onclick="userManage()">用户管理</button>
     <button class="btn btn-vip" onclick="makeSeed()">生成永久邀请码</button>
     <button class="btn btn-light" onclick="home()">退出</button>
   </div>`;
 }
 
-function checkPay(){
-  let list = payApplys.filter(x=>x.status=="pending");
-  let html = `<div class="card"><div class="title">待审核</div>`;
-  list.forEach(x=>{
-    html+=`<div class="item">
-      <div>${x.nick} ${x.pkg} ¥${x.price}</div>
-      <button class="btn btn-success" onclick="passPay(${x.id})">通过并发邀请码</button>
-    </div>`;
-  });
-  html+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;
-  app.innerHTML=html;
-}
-
-function passPay(id){
-  let item = payApplys.find(x=>x.id==id);
-  let code = randCode();
-  codes.push({code,name:item.pkg,days:item.days,used:false});
-  item.status="pass";
-  item.code=code;
-  save();alert("已通过！邀请码："+code);checkPay();
-}
-
-function makeSeed(){
-  let code = randCode();
-  seedCodes.push({code});
-  save();alert("永久邀请码："+code);admin();
-}
-
-// 试卷导入
-function importPaper(){
+// ========== 手动添加三种题型 ==========
+function singleAddQ(){
+  let paperOpt = papers.map(p=>`<option value="${p.id}">${p.title}【${p.area}${p.grade}】</option>`).join("");
   app.innerHTML=`
   <div class="card">
-    <div class="title">试卷导入</div>
-    <textarea class="input" id="txt" placeholder="粘贴纯文本单选题目"></textarea>
-    <button class="btn" onclick="parseTxt()">解析题目</button>
+    <div class="title">手动新增题目</div>
+    <select class="input" id="selPid">
+      <option value="">选择所属试卷</option>${paperOpt}
+    </select>
+    <select class="input" id="qType">
+      <option value="${TYPE_SEL}">单选题</option>
+      <option value="${TYPE_JUDGE}">判断题</option>
+      <option value="${TYPE_BLANK}">填空题</option>
+    </select>
+    <textarea class="input" id="qContent" placeholder="填写题干"></textarea>
+
+    <div id="optBox">
+      <input class="input" id="optA" placeholder="A选项">
+      <input class="input" id="optB" placeholder="B选项">
+      <input class="input" id="optC" placeholder="C选项">
+      <input class="input" id="optD" placeholder="D选项">
+    </div>
+
+    <input class="input" id="rightAns" placeholder="单选:A/B/C/D｜判断:对/错｜填空:标准答案">
+    <button class="btn btn-success" onclick="saveSingleQ()">保存本题</button>
     <button class="btn btn-light" onclick="admin()">返回</button>
   </div>`;
 }
 
+function saveSingleQ(){
+  let pid = document.getElementById("selPid").value;
+  let type = Number(document.getElementById("qType").value);
+  let content = document.getElementById("qContent").value.trim();
+  let ans = document.getElementById("rightAns").value.trim();
+  if(!pid||!content||!ans) return alert("试卷、题干、标准答案必填");
+
+  let optArr = [];
+  if(type===TYPE_SEL){
+    let a=document.getElementById("optA").value.trim();
+    let b=document.getElementById("optB").value.trim();
+    let c=document.getElementById("optC").value.trim();
+    let d=document.getElementById("optD").value.trim();
+    if(!a||!b||!c||!d) return alert("单选四项选项必填");
+    optArr=[a,b,c,d];
+  }else{
+    optArr=["","","",""]; // 判断/填空不需要选项，占位
+  }
+
+  questions.push({
+    id:Date.now(),
+    pid:Number(pid),
+    type:type,
+    content:content,
+    op:optArr,
+    answer:ans
+  });
+  save();
+  alert("保存成功，继续添加下一题");
+  singleAddQ();
+}
+
+function checkPay(){
+  let list = payApplys.filter(x=>x.status=="pending");
+  let html = `<div class="card"><div class="title">待审核</div>`;
+  list.forEach(x=>{
+    html+=`<div class="item">${x.nick} ${x.pkg} ¥${x.price}<button class="btn btn-success" onclick="passPay(${x.id})">通过发码</button></div>`;
+  });
+  html+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;
+  app.innerHTML=html;
+}
+function passPay(id){
+  let item = payApplys.find(x=>x.id==id);
+  let code = randCode();
+  codes.push({code,name:item.pkg,days:item.days,used:false});
+  item.status="pass";item.code=code;save();
+  alert("已通过！邀请码："+code);checkPay();
+}
+function makeSeed(){
+  let code = randCode();seedCodes.push({code});save();
+  alert("永久邀请码："+code);admin();
+}
+
+// 批量导入仅单选不变
+function importPaper(){
+  app.innerHTML=`
+  <div class="card">
+    <div class="title">批量导入单选</div>
+    <textarea class="input" id="txt" placeholder="粘贴单选文本"></textarea>
+    <button class="btn" onclick="parseTxt()">解析</button>
+    <button class="btn btn-light" onclick="admin()">返回</button>
+  </div>`;
+}
 function parseTxt(){
   let txt = document.getElementById("txt").value;
   let lines = txt.split("\n").map(x=>x.trim()).filter(x=>x);
   let list = [];
-  let type=1,title="",opt=[];
+  let title="",opt=[];
   lines.forEach(line=>{
-    if(line.includes("【单选】")){type=1;return;}
     if(/^\d+\./.test(line)){
-      if(title) list.push({type,title,opt: [...opt]});
-      title = line.replace(/^\d+\./,"").trim();
-      opt=[];
+      if(title) list.push({type:TYPE_SEL,title,opt:[...opt]});
+      title = line.replace(/^\d+\./,"").trim();opt=[];
     }
-    if(line.startsWith("A.")) opt.push(line.substring(2).trim());
-    if(line.startsWith("B.")) opt.push(line.substring(2).trim());
-    if(line.startsWith("C.")) opt.push(line.substring(2).trim());
-    if(line.startsWith("D.")) opt.push(line.substring(2).trim());
+    if(line.startsWith("A."))opt.push(line.slice(2).trim());
+    if(line.startsWith("B."))opt.push(line.slice(2).trim());
+    if(line.startsWith("C."))opt.push(line.slice(2).trim());
+    if(line.startsWith("D."))opt.push(line.slice(2).trim());
   });
-  if(title) list.push({type,title,opt:[...opt]});
-  tempImport = list;
-  editPaper();
+  if(title) list.push({type:TYPE_SEL,title,opt:[...opt]});
+  tempImport=list;editPaper();
 }
-
 function editPaper(){
-  let html = `<div class="card"><div class="title">编辑题目</div>`;
+  let html = `<div class="card"><div class="title">批量编辑单选</div>`;
   tempImport.forEach((q,i)=>{
-    html+=`
-    <div class="item">
-      <div>第${i+1}题</div>
-      <input class="input" id="t${i}" value="${q.title}">
-      <input class="input" id="a${i}" value="${q.opt[0]||''}">
-      <input class="input" id="b${i}" value="${q.opt[1]||''}">
-      <input class="input" id="c${i}" value="${q.opt[2]||''}">
-      <input class="input" id="d${i}" value="${q.opt[3]||''}">
-      <input class="input" id="ans${i}" placeholder="答案 A/B/C/D">
+    html+=`<div class="item">
+    <input class="input" id="t${i}" value="${q.title}">
+    <input class="input" id="a${i}" value="${q.opt[0]||''}">
+    <input class="input" id="b${i}" value="${q.opt[1]||''}">
+    <input class="input" id="c${i}" value="${q.opt[2]||''}">
+    <input class="input" id="d${i}" value="${q.opt[3]||''}">
+    <input class="input" id="ans${i}" placeholder="答案A/B/C/D">
     </div>`;
   });
   html+=`
-  <select class="input" id="area">${AREAS.map(a=>`<option value="${a}">${a}</option>`).join("")}</select>
-  <select class="input" id="grade">${GRADES.map(g=>`<option value="${g}">${g}</option>`).join("")}</select>
+  <select class="input" id="area">${AREAS.map(a=>`<option>${a}</option>`).join("")}</select>
+  <select class="input" id="grade">${GRADES.map(g=>`<option>${g}</option>`).join("")}</select>
   <input class="input" id="title" placeholder="试卷名称">
   <button class="btn btn-success" onclick="savePaper()">保存入库</button>
   <button class="btn btn-light" onclick="admin()">返回</button></div>`;
   app.innerHTML=html;
 }
-
 function savePaper(){
-  let area = document.getElementById("area").value;
-  let grade = document.getElementById("grade").value;
-  let title = document.getElementById("title").value;
-  let pid = Date.now();
+  let area=document.getElementById("area").value;
+  let grade=document.getElementById("grade").value;
+  let title=document.getElementById("title").value;
+  let pid=Date.now();
   papers.push({id:pid,title,sub:"math",area,grade});
   tempImport.forEach((q,i)=>{
-    let t = document.getElementById("t"+i).value;
-    let a = document.getElementById("a"+i).value;
-    let b = document.getElementById("b"+i).value;
-    let c = document.getElementById("c"+i).value;
-    let d = document.getElementById("d"+i).value;
-    let ans = document.getElementById("ans"+i).value;
-    questions.push({id:Date.now()+i,pid,type:1,content:t,op:[a,b,c,d],answer:ans});
+    let t=document.getElementById("t"+i).value;
+    let a=document.getElementById("a"+i).value;
+    let b=document.getElementById("b"+i).value;
+    let c=document.getElementById("c"+i).value;
+    let d=document.getElementById("d"+i).value;
+    let ans=document.getElementById("ans"+i).value;
+    questions.push({id:Date.now()+i,pid,type:TYPE_SEL,content:t,op:[a,b,c,d],answer:ans});
   });
-  save();alert("保存成功！");admin();
+  save();alert("保存成功");admin();
 }
 
-// 题库管理
+// 题库修改（兼容三种题型）
 function managePaper(){
   let html = `<div class="card"><div class="title">题库管理</div>`;
-  papers.forEach(p=>{
-    html+=`<div class="item" onclick="editQ(${p.id})">${p.title} (${p.area}${p.grade})</div>`;
-  });
+  papers.forEach(p=>html+=`<div class="item" onclick="editQ(${p.id})">${p.title} ${p.area}${p.grade}</div>`);
   html+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;
   app.innerHTML=html;
 }
-
 function editQ(pid){
   let qs = questions.filter(x=>x.pid==pid);
   let html = `<div class="card"><div class="title">修改题目</div>`;
   qs.forEach((q,i)=>{
-    html+=`
-    <div class="item">
-      <input class="input" id="qc${i}" value="${q.content}">
+    let tpName = q.type==1?"单选":q.type==2?"判断":"填空";
+    html+=`<div class="item"><div>【${tpName}】</div>
+    <input class="input" id="qc${i}" value="${q.content}">`;
+    if(q.type===TYPE_SEL){
+      html+=`
       <input class="input" id="qa${i}" value="${q.op[0]}">
       <input class="input" id="qb${i}" value="${q.op[1]}">
-      <input class="input" id="qc${i}" value="${q.op[2]}">
-      <input class="input" id="qd${i}" value="${q.op[3]}">
-      <input class="input" id="qans${i}" value="${q.answer}" placeholder="答案">
-      <button class="btn" onclick="updateQ(${q.id},${i})">保存</button>
+      <input class="input" id="qcc${i}" value="${q.op[2]}">
+      <input class="input" id="qd${i}" value="${q.op[3]}">`;
+    }
+    html+=`<input class="input" id="qans${i}" value="${q.answer}" placeholder="答案">
+    <button class="btn" onclick="updateQ(${q.id},${i},${q.type})">保存修改</button>
     </div>`;
   });
   html+=`<button class="btn btn-light" onclick="managePaper()">返回</button></div>`;
   app.innerHTML=html;
 }
-
-function updateQ(qid,i){
+function updateQ(qid,i,tp){
   let q = questions.find(x=>x.id==qid);
   q.content = document.getElementById("qc"+i).value;
-  q.op = [
-    document.getElementById("qa"+i).value,
-    document.getElementById("qb"+i).value,
-    document.getElementById("qc"+i).value,
-    document.getElementById("qd"+i).value
-  ];
   q.answer = document.getElementById("qans"+i).value;
-  save();alert("已保存");
+  if(tp===TYPE_SEL){
+    q.op = [
+      document.getElementById("qa"+i).value,
+      document.getElementById("qb"+i).value,
+      document.getElementById("qcc"+i).value,
+      document.getElementById("qd"+i).value
+    ];
+  }
+  save();alert("修改完成");
 }
 
 function userManage(){
