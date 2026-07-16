@@ -8,37 +8,183 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         *{margin:0;padding:0;box-sizing:border-box;font-family:PingFang SC,Microsoft YaHei,sans-serif}
-        body{background:#f7f8fa;padding:15px;}
-        .container{max-width:560px;margin:auto;}
+        body{background:#f7f8fa;padding:15px;position:relative;}
+        /* 全局水印 */
+        body::before{
+            content:"大湾区全科刷题系统";
+            position:fixed;
+            inset:0;
+            color:#cdd6f4;
+            font-size:14px;
+            line-height:4;
+            transform:rotate(-20deg);
+            pointer-events:none;
+            z-index:-1;
+            opacity:0.4;
+        }
+        .container{max-width:1200px;margin:auto;}
         .card{background:#fff;border-radius:16px;padding:20px;margin:12px 0;box-shadow:0 2px 10px rgba(0,0,0,0.06);}
         .title{font-size:20px;font-weight:bold;color:#2563eb;text-align:center;margin-bottom:12px;}
         .sub-title{color:#666;font-size:14px;text-align:center;margin-bottom:12px;line-height:1.5}
         .tip{background:#fffbeb;color:#d97706;border:1px solid #fcd34d;border-radius:10px;padding:12px;margin:10px 0;font-size:14px;}
-        .btn{width:100%;padding:12px;border:none;border-radius:12px;margin:8px 0;font-size:15px;background:#2563eb;color:#fff;cursor:pointer;}
+        .tip-success{background:#ecfdf5;color:#047857;border:1px solid #6ee7b7;}
+        .btn{width:100%;padding:12px;border:none;border-radius:12px;margin:8px 0;font-size:15px;background:#2563eb;color:#fff;cursor:pointer;transition:0.2s;}
+        .btn:hover{opacity:0.9}
         .btn-success{background:#10b981;}
         .btn-warning{background:#f59e0b;}
         .btn-vip{background:#8b5cf6;}
         .btn-light{background:#eef2ff;color:#2563eb;}
-        .input{width:100%;padding:12px;border:1px solid #e5e7eb;border-radius:12px;margin:8px 0;}
+        .btn-danger{background:#ef4444;}
+        .input{width:100%;padding:12px;border:1px solid #e5e7eb;border-radius:12px;margin:8px 0;font-size:14px;}
         .qrcode{width:180px;height:180px;margin:15px auto;border-radius:12px;display:block;}
         .item{background:#f9fafb;border-radius:10px;padding:12px;margin:8px 0;}
         label{display:block;margin:6px 0;}
         textarea.input{min-height:120px;resize:none;}
         .chart-box{height:250px;margin:15px 0;}
+        .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+        /* 自定义弹窗 */
+        .mask{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:999;}
+        .modal{background:#fff;border-radius:16px;padding:20px;width:90%;max-width:420px;}
+        .modal-btns{display:flex;gap:10px;margin-top:10px;}
+        .page-bar{display:flex;gap:8px;margin:12px 0;justify-content:center;}
+        .page-btn{padding:6px 12px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;cursor:pointer;}
+        .page-btn.active{background:#2563eb;color:#fff;border-color:#2563eb;}
+        .tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:12px;margin:2px;background:#dbeafe;color:#2563eb;}
+        .loading{text-align:center;padding:20px;color:#2563eb;}
     </style>
 </head>
 <body>
 <div class="container" id="app"></div>
 
 <script>
-const ADMIN_PASS = "awedsr134793";
-const PAY_QRCODE ="wx.png";
+// ===================== 【重点修改这里】填入你的云服务器公网IP =====================
+const API_BASE = "http://你的服务器公网IP:5000";
+// ===================== 全局数据存储封装层（含云端同步合并逻辑） =====================
+const Store = {
+    keyList: ["users","papers","questions","wrongBooks","examHistory","codes","seedCodes","payApplys","adminPwd","opLogs"],
+    // 本地题库版本管理
+    getLocalDbVer(){
+        return parseInt(localStorage.getItem("localDbVer") || "0");
+    },
+    setLocalDbVer(v){
+        localStorage.setItem("localDbVer", String(v));
+    },
+    encode(str){
+        return btoa(unescape(encodeURIComponent(str)));
+    },
+    decode(str){
+        try{
+            return decodeURIComponent(escape(atob(str)));
+        }catch(e){return "[]"}
+    },
+    set(key,data){
+        let str = JSON.stringify(data);
+        localStorage.setItem(key,this.encode(str));
+    },
+    get(key){
+        let val = localStorage.getItem(key);
+        if(!val) return [];
+        try{
+            return JSON.parse(this.decode(val));
+        }catch(e){
+            return [];
+        }
+    },
+    saveAll(){
+        this.keyList.forEach(k=>{
+            if(window[k] !== undefined) this.set(k,window[k]);
+        })
+    },
+    // 云端题库合并：只更新papers、questions，保留用户错题/会员/记录
+    mergeCloudLib(cloudJson){
+        // 合并试卷：存在则覆盖更新，不存在新增
+        cloudJson.papers.forEach(paper=>{
+            const idx = papers.findIndex(p=>p.id === paper.id);
+            if(idx > -1) papers[idx] = paper;
+            else papers.push(paper);
+        })
+        // 合并题目
+        cloudJson.questions.forEach(q=>{
+            const idx = questions.findIndex(item=>item.id === q.id);
+            if(idx > -1) questions[idx] = q;
+            else questions.push(q);
+        })
+        this.saveAll();
+    },
+    // 全库导出备份
+    exportAll(){
+        let all = {};
+        this.keyList.forEach(k=>all[k] = this.get(k));
+        let blob = new Blob([JSON.stringify(all,null,2)],{type:"application/json"});
+        let a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `大湾区题库备份_${new Date().toLocaleDateString()}.json`;
+        a.click();
+    },
+    // 本地导入备份
+    importAll(fileObj,cb){
+        let fr = new FileReader();
+        fr.onload = e=>{
+            try{
+                let data = JSON.parse(e.target.result);
+                Object.keys(data).forEach(k=>{
+                    if(this.keyList.includes(k)) window[k] = data[k];
+                })
+                this.saveAll();
+                cb(true,"本地备份导入成功");
+            }catch(err){
+                cb(false,"文件格式错误");
+            }
+        }
+        fr.readAsText(fileObj);
+    },
+    // 操作日志记录
+    log(text){
+        let logs = this.get("opLogs");
+        logs.push({time:new Date().toLocaleString(),content:text});
+        window.opLogs = logs;
+        this.set("opLogs",logs);
+    }
+}
 
-// 题型常量 1单选 2判断 3填空
+// ===================== 云端同步核心函数 =====================
+// 自动检测云端题库更新
+async function checkDbUpdate(){
+    try{
+        const verResp = await fetch(`${API_BASE}/api/get_version`);
+        const verData = await verResp.json();
+        const cloudVersion = verData.version;
+        const localVersion = Store.getLocalDbVer();
+        if(cloudVersion <= localVersion){
+            return; // 无更新直接退出
+        }
+        // 弹窗提示更新
+        Modal("题库更新通知",`老师已更新题库（云端版本：${cloudVersion}），包含新增试卷/题目，是否同步？`,async ()=>{
+            app.innerHTML = `<div class="loading">正在下载最新题库，请稍候...</div>`;
+            // 下载云端题库文件
+            const libResp = await fetch(`${API_BASE}/api/download_lib`);
+            const libText = await libResp.text();
+            const cloudData = JSON.parse(libText);
+            // 合并到本地存储
+            Store.mergeCloudLib(cloudData);
+            // 更新本地版本号
+            Store.setLocalDbVer(cloudVersion);
+            Toast("题库同步完成！");
+            // 刷新首页
+            home();
+        },()=>{
+            Toast("已忽略本次更新，下次打开页面再次提醒");
+        })
+    }catch(err){
+        console.log("云端服务器连接失败，跳过更新检测：",err);
+    }
+}
+
+// ===================== 常量配置 =====================
+const PAY_QRCODE ="wx.png";
 const TYPE_SEL = 1;
 const TYPE_JUDGE = 2;
 const TYPE_BLANK = 3;
-
 const PACKAGES = [
   {name:"体验会员",days:1,price:9.9},
   {name:"月会员",days:30,price:38},
@@ -46,57 +192,119 @@ const PACKAGES = [
   {name:"年会员",days:365,price:128},
   {name:"永久会员",days:99999,price:199}
 ];
-
 const AREAS = ["中山","广州","深圳","东莞","佛山","珠海","惠州"];
 const GRADES = ["一年级","二年级","三年级","四年级","五年级","六年级","初一","初二","初三"];
+const KNOWLEDGE = ["有理数","一元二次方程","函数","几何","概率","分式","不等式"];
 
-// 读取本地原有数据【你已建的试卷、题目全部保留】
-let users = JSON.parse(localStorage.getItem("users")) || [];
-let papers = JSON.parse(localStorage.getItem("papers")) || [];
-let questions = JSON.parse(localStorage.getItem("questions")) || [];
-let wrongBooks = JSON.parse(localStorage.getItem("wrongBooks")) || [];
-let examHistory = JSON.parse(localStorage.getItem("examHistory")) || [];
-let codes = JSON.parse(localStorage.getItem("codes")) || [];
-let seedCodes = JSON.parse(localStorage.getItem("seedCodes")) || [];
-let payApplys = JSON.parse(localStorage.getItem("payApplys")) || [];
+// ===================== 工具函数 =====================
+function day(){return Math.floor(Date.now()/86400000)}
+function randCode(){return Math.random().toString(36).substring(2,8).toUpperCase()}
+function genID(){return Date.now() + Math.floor(Math.random()*9999)}
+// 自定义弹窗
+function Modal(title,html,confirmCb,cancelCb){
+    let mask = document.createElement("div");
+    mask.className = "mask";
+    mask.innerHTML = `
+    <div class="modal">
+        <h3 style="margin-bottom:10px">${title}</h3>
+        <div id="modal-body">${html}</div>
+        <div class="modal-btns">
+            <button class="btn btn-light" id="modal-cancel">取消</button>
+            <button class="btn" id="modal-ok">确认</button>
+        </div>
+    </div>`;
+    document.body.appendChild(mask);
+    document.getElementById("modal-cancel").onclick = ()=>{
+        mask.remove();
+        if(cancelCb) cancelCb();
+    }
+    document.getElementById("modal-ok").onclick = ()=>{
+        mask.remove();
+        if(confirmCb) confirmCb();
+    }
+}
+function Toast(msg){
+    let div = document.createElement("div");
+    div.style = "position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fff;padding:10px 16px;border-radius:8px;z-index:9999";
+    div.innerText = msg;
+    document.body.appendChild(div);
+    setTimeout(()=>div.remove(),1500);
+}
+
+// ===================== 全局变量初始化 =====================
+let users = Store.get("users");
+let papers = Store.get("papers");
+let questions = Store.get("questions");
+let wrongBooks = Store.get("wrongBooks");
+let examHistory = Store.get("examHistory");
+let codes = Store.get("codes");
+let seedCodes = Store.get("seedCodes");
+let payApplys = Store.get("payApplys");
+let opLogs = Store.get("opLogs");
+let adminPwd = Store.get("adminPwd") || "";
 
 let currentUser = null;
 let nowPaperId = 0;
 let tempImport = [];
+let examCache = {};
+const PAGE_SIZE = 20;
 
-function save(){
-  localStorage.setItem("users",JSON.stringify(users));
-  localStorage.setItem("papers",JSON.stringify(papers));
-  localStorage.setItem("questions",JSON.stringify(questions));
-  localStorage.setItem("wrongBooks",JSON.stringify(wrongBooks));
-  localStorage.setItem("examHistory",JSON.stringify(examHistory));
-  localStorage.setItem("codes",JSON.stringify(codes));
-  localStorage.setItem("seedCodes",JSON.stringify(seedCodes));
-  localStorage.setItem("payApplys",JSON.stringify(payApplys));
-}
-
-function day(){return Math.floor(Date.now()/86400000)}
-function randCode(){return Math.random().toString(36).substring(2,8).toUpperCase()}
-
+// ===================== 会员有效期校验 =====================
 function checkUserExpire(){
   if(!currentUser) return false;
   if(currentUser.vipType=="种子家长永久会员") return true;
   let expire = currentUser.regDay + currentUser.validDays;
-  if(day()>expire){alert("会员已到期");currentUser=null;home();return false;}
+  if(day()>expire){
+    Toast("会员已到期，请重新开通");
+    currentUser=null;
+    home();
+    return false;
+  }
   return true;
 }
 
-// ===================== 首页 =====================
+// ===================== 首页（新增云端同步按钮，打开自动检测更新） =====================
 function home(){
+  // 页面加载自动执行云端更新检测
+  checkDbUpdate();
+
+  let setPwdHtml = "";
+  if(!adminPwd){
+      setPwdHtml = `<div class="tip tip-success">管理员未设置密码，请前往后台设置初始密码</div>`;
+  }
   app.innerHTML=`
   <div class="card">
     <div class="title">大湾区全科</div>
     <div class="sub-title">中小学智能刷题学习平台</div>
+    ${setPwdHtml}
     <button class="btn" onclick="login()">学生登录</button>
     <button class="btn" onclick="reg()">注册账号</button>
     <button class="btn btn-warning" onclick="payPage()">开通会员</button>
     <button class="btn btn-light" onclick="adminLogin()">教师后台</button>
+    <div class="row">
+        <button class="btn btn-light" onclick="backupExport()">导出全部题库备份</button>
+        <button class="btn btn-light" onclick="backupImport()">导入本地备份</button>
+        <button class="btn btn-light" onclick="checkDbUpdate()">手动检查云端题库更新</button>
+    </div>
   </div>`;
+}
+function backupExport(){
+    Store.exportAll();
+    Toast("本地全量备份文件已下载");
+}
+function backupImport(){
+    let input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.onchange = e=>{
+        let f = e.target.files[0];
+        if(!f) return;
+        Store.importAll(f,(ok,msg)=>{
+            Toast(msg);
+            if(ok) location.reload();
+        })
+    }
+    input.click();
 }
 
 // ===================== 登录注册 =====================
@@ -110,14 +318,15 @@ function login(){
     <button class="btn btn-light" onclick="home()">返回</button>
   </div>`;
 }
-
 function loginGo(){
-  let u = document.getElementById("user").value;
-  let p = document.getElementById("pwd").value;
+  let u = document.getElementById("user").value.trim();
+  let p = document.getElementById("pwd").value.trim();
+  if(!u||!p) return Toast("账号密码不能为空");
   let user = users.find(x=>x.username==u&&x.password==p);
-  if(!user) return alert("账号或密码错误");
-  if(user.vipType!="种子家长永久会员" && day()>user.regDay+user.validDays) return alert("会员已到期");
+  if(!user) return Toast("账号或密码错误");
+  if(user.vipType!="种子家长永久会员" && day()>user.regDay+user.validDays) return Toast("会员已到期");
   currentUser = user;
+  Store.log(`学生登录：${user.username} ${user.name}`);
   student();
 }
 
@@ -137,7 +346,6 @@ function reg(){
     <button class="btn btn-light" onclick="home()">返回</button>
   </div>`;
 }
-
 function regGo(){
   let u=document.getElementById("ru").value.trim();
   let p=document.getElementById("rp").value.trim();
@@ -145,26 +353,34 @@ function regGo(){
   let a=document.getElementById("rarea").value;
   let g=document.getElementById("rgrade").value;
   let c=document.getElementById("rc").value.trim();
-  if(!u||!p||!n||!c) return alert("请填写完整");
+  if(!u||!p||!n||!c) return Toast("请填写完整信息");
+  if(users.find(x=>x.username === u)) return Toast("账号已存在");
 
   let seed = seedCodes.find(x=>x.code==c);
   if(seed){
     users.push({username:u,password:p,name:n,area:a,grade:g,regDay:day(),validDays:99999,vipType:"种子家长永久会员"});
-    save();alert("注册成功！永久免费");login();return;
+    Store.saveAll();
+    Store.log(`注册永久种子用户：${u} ${n}`);
+    Toast("注册成功！永久免费");
+    login();
+    return;
   }
 
   let code = codes.find(x=>x.code==c&&!x.used);
-  if(!code) return alert("邀请码无效");
+  if(!code) return Toast("邀请码无效或已使用");
   code.used=true;
   users.push({username:u,password:p,name:n,area:a,grade:g,regDay:day(),validDays:code.days,vipType:code.name});
-  save();alert("注册成功！");login();
+  Store.saveAll();
+  Store.log(`注册付费会员：${u} ${n} 邀请码${c}`);
+  Toast("注册成功！");
+  login();
 }
 
 // ===================== 开通会员 =====================
 function payPage(){
   let list = PACKAGES.map((o,i)=>`
   <div class="item">
-    <div>${o.name}  ¥${o.price}</div>
+    <div>${o.name}  ¥${o.price} / ${o.days}天</div>
     <button class="btn btn-success" onclick="goPay(${i})">选择套餐</button>
   </div>`).join("");
 
@@ -172,16 +388,16 @@ function payPage(){
   <div class="card">
     <div class="title">开通会员</div>
     <div class="tip">
-      📌 开通流程（必看）<br>
+      📌 开通流程<br>
       1. 选择套餐 → 2. 扫码付款 → 3. 提交信息 → 4. 管理员审核 → 5. 获取邀请码
     </div>
     <img src="${PAY_QRCODE}" class="qrcode">
     ${list}
+    <input class="input" id="checkNick" placeholder="输入家长姓名查询审核进度">
     <button class="btn btn-light" onclick="checkPayStatus()">查看我的审核进度</button>
     <button class="btn btn-light" onclick="home()">返回</button>
   </div>`;
 }
-
 function goPay(i){
   let pkg = PACKAGES[i];
   app.innerHTML=`
@@ -190,31 +406,38 @@ function goPay(i){
     <div class="sub-title">套餐：${pkg.name} 价格：¥${pkg.price}</div>
     <div class="tip">请先完成付款，再提交信息</div>
     <input class="input" id="nick" placeholder="家长姓名">
-    <input class="input" id="phone" placeholder="联系电话">
+    <input class="input" id="phone" placeholder="联系电话(11位)">
     <button class="btn" onclick="submitPay(${i})">确认提交，等待审核</button>
     <button class="btn btn-light" onclick="payPage()">返回</button>
   </div>`;
 }
-
 function submitPay(i){
   let nick = document.getElementById("nick").value.trim();
   let phone = document.getElementById("phone").value.trim();
-  if(!nick) return alert("请填写家长姓名");
+  if(!nick) return Toast("请填写家长姓名");
+  if(!/^1\d{10}$/.test(phone)) return Toast("手机号格式错误");
+  let repeat = payApplys.find(x=>x.nick==nick&&x.phone==phone&&x.status=="pending");
+  if(repeat) return Toast("已有待审核订单，请勿重复提交");
   payApplys.push({
-    id:Date.now(),nick,phone,pkg:PACKAGES[i].name,
+    id:genID(),nick,phone,pkg:PACKAGES[i].name,
     price:PACKAGES[i].price,days:PACKAGES[i].days,
     status:"pending",code:"",time:new Date().toLocaleString()
   });
-  save();alert("提交成功！请等待管理员审核");payPage();
+  Store.saveAll();
+  Store.log(`新增付费申请：${nick} ${PACKAGES[i].name}`);
+  Toast("提交成功！请等待管理员审核");
+  payPage();
 }
-
 function checkPayStatus(){
-  let nickVal = document.getElementById("nick")?.value||"";
+  let nickVal = document.getElementById("checkNick")?.value.trim()||"";
+  if(!nickVal) return Toast("请输入家长姓名");
   let my = payApplys.filter(x=>x.nick==nickVal);
+  if(!my.length) return Toast("无匹配订单");
   let html = `<div class="card"><div class="title">审核进度</div>`;
   my.forEach(x=>{
     html+=`<div class="item">
       <div>套餐：${x.pkg}</div>
+      <div>下单时间：${x.time}</div>
       <div>状态：${x.status=="pending"?"⏳等待审核":"✅已通过，邀请码："+x.code}</div>
     </div>`;
   });
@@ -229,22 +452,21 @@ function student(){
   app.innerHTML=`
   <div class="card">
     <div class="title">您好，${currentUser.name}</div>
-    <div class="sub-title">${currentUser.area} ${currentUser.grade} | 剩余${left}天</div>
+    <div class="sub-title">${currentUser.area} ${currentUser.grade} | 剩余${left}天会员</div>
     <button class="btn" onclick="examList('math')">开始刷题</button>
-    <button class="btn btn-success" onclick="showMyChart()">📈 我的学习进步曲线</button>
+    <button class="btn btn-success" onclick="showMyChart()">📈 学习进步曲线</button>
     <button class="btn btn-warning" onclick="myWrong()">错题本</button>
-    <button class="btn btn-light" onclick="home()">退出</button>
+    <button class="btn btn-light" onclick="home()">退出登录</button>
   </div>`;
 }
-
 function showMyChart(){
-  let records = examHistory.filter(x=>x.user==currentUser.username).slice(-8);
-  if(records.length==0) return alert("暂无练习记录，请先刷题");
+  let records = examHistory.filter(x=>x.user==currentUser.username);
+  if(records.length==0) return Toast("暂无练习记录，请先刷题");
   let html = `
   <div class="card">
     <div class="title">学习进步趋势</div>
     <div class="chart-box"><canvas id="scoreChart"></canvas></div>`;
-  records.forEach(r=>{
+  records.forEach((r,i)=>{
     html+=`<div class="item">${r.time}  得分：${r.score}/${r.total}</div>`;
   });
   html+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
@@ -267,53 +489,87 @@ function showMyChart(){
     });
   },100);
 }
-
 function examList(sub){
   if(!checkUserExpire()) return;
   let list = papers.filter(p=>p.sub==sub&&p.area==currentUser.area&&p.grade==currentUser.grade);
   let html = `<div class="card"><div class="title">数学题库</div>`;
+  html += `<input class="input" id="paperSearch" placeholder="搜索试卷名称">`;
   list.forEach(p=>html+=`<button class="btn" onclick="startExam(${p.id})">${p.title}</button>`);
   html+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
   app.innerHTML=html;
+  document.getElementById("paperSearch").oninput = e=>{
+      let kw = e.target.value.toLowerCase();
+      let wrap = app.querySelector(".card");
+      let btns = wrap.querySelectorAll("button[onclick^='startExam']");
+      btns.forEach(btn=>{
+          let txt = btn.innerText.toLowerCase();
+          btn.style.display = txt.includes(kw) ? "block" : "none";
+      })
+  }
 }
 
-// 三种题型渲染
-function startExam(pid){
+function startExam(pid,page=1){
   if(!checkUserExpire()) return;
   nowPaperId = pid;
-  let qs = questions.filter(x=>x.pid==pid);
-  let html = `<div class="card"><div class="title">开始答题</div>`;
-  qs.forEach((q,i)=>{
+  if(!examCache[pid]) examCache[pid] = {};
+  let allQs = questions.filter(x=>x.pid==pid);
+  let total = allQs.length;
+  let totalPage = Math.ceil(total / PAGE_SIZE);
+  let start = (page-1)*PAGE_SIZE;
+  let qs = allQs.slice(start,start+PAGE_SIZE);
+
+  let html = `<div class="card"><div class="title">${papers.find(p=>p.id==pid).title} 第${page}/${totalPage}页</div>`;
+  qs.forEach((q,idx)=>{
+    let realIdx = start + idx;
+    let cacheAns = examCache[pid][realIdx] || "";
     html+=`<div style="margin:12px 0;border-bottom:1px solid #eee;padding-bottom:10px;">`;
-    html+=`<div style="font-weight:bold;margin-bottom:6px;">${i+1}. ${q.content}</div>`;
+    html+=`<div style="font-weight:bold;margin-bottom:6px;">${realIdx+1}. ${q.content} <span class="tag">${q.knowledge||"未标记知识点"}</span></div>`;
     if(q.type === TYPE_SEL){
-      html+=`<label><input type="radio" name="q${i}" value="A"> A. ${q.op[0]}</label>`;
-      html+=`<label><input type="radio" name="q${i}" value="B"> B. ${q.op[1]}</label>`;
-      html+=`<label><input type="radio" name="q${i}" value="C"> C. ${q.op[2]}</label>`;
-      html+=`<label><input type="radio" name="q${i}" value="D"> D. ${q.op[3]}</label>`;
+      html+=`<label><input type="radio" name="q${realIdx}" value="A" ${cacheAns=="A"?"checked":""}> A. ${q.op[0]}</label>`;
+      html+=`<label><input type="radio" name="q${realIdx}" value="B" ${cacheAns=="B"?"checked":""}> B. ${q.op[1]}</label>`;
+      html+=`<label><input type="radio" name="q${realIdx}" value="C" ${cacheAns=="C"?"checked":""}> C. ${q.op[2]}</label>`;
+      html+=`<label><input type="radio" name="q${realIdx}" value="D" ${cacheAns=="D"?"checked":""}> D. ${q.op[3]}</label>`;
     }else if(q.type === TYPE_JUDGE){
-      html+=`<label><input type="radio" name="q${i}" value="对"> 正确</label>`;
-      html+=`<label><input type="radio" name="q${i}" value="错"> 错误</label>`;
+      html+=`<label><input type="radio" name="q${realIdx}" value="对" ${cacheAns=="对"?"checked":""}> 正确</label>`;
+      html+=`<label><input type="radio" name="q${realIdx}" value="错" ${cacheAns=="错"?"checked":""}> 错误</label>`;
     }else if(q.type === TYPE_BLANK){
-      html+=`<input class="input" placeholder="填写答案" id="blank${i}">`;
+      html+=`<input class="input" placeholder="填写答案" id="blank${realIdx}" value="${cacheAns}">`;
     }
     html+=`</div>`;
   });
-  html+=`<button class="btn btn-success" onclick="submitExam()">提交试卷</button></div>`;
+  html += `<div class="page-bar">`;
+  if(page>1) html += `<button class="page-btn" onclick="saveCacheAndGo(${pid},${page-1})">上一页</button>`;
+  if(page<totalPage) html += `<button class="page-btn" onclick="saveCacheAndGo(${pid},${page+1})">下一页</button>`;
+  html += `</div>`;
+  html+=`<button class="btn btn-success" onclick="submitExam()">提交全部试卷</button>`;
+  html+=`<button class="btn btn-light" onclick="saveExamCache(${pid})">暂存作答，退出</button></div>`;
   app.innerHTML=html;
 }
-
-// 阅卷判分
+function saveCacheAndGo(pid,newPage){
+    saveExamCache(pid);
+    startExam(pid,newPage);
+}
+function saveExamCache(pid){
+    let allQs = questions.filter(x=>x.pid==pid);
+    allQs.forEach((q,i)=>{
+        let ans;
+        if(q.type===TYPE_SEL || q.type===TYPE_JUDGE){
+            let sel = document.querySelector(`input[name="q${i}"]:checked`);
+            ans = sel ? sel.value : "";
+        }else{
+            let inp = document.getElementById("blank"+i);
+            ans = inp ? inp.value.trim() : "";
+        }
+        examCache[pid][i] = ans;
+    })
+    Toast("作答已暂存");
+}
 function submitExam(){
+  saveExamCache(nowPaperId);
   let qs = questions.filter(x=>x.pid==nowPaperId);
   let score=0,wrong=[];
   qs.forEach((q,i)=>{
-    let userAns;
-    if(q.type===TYPE_SEL || q.type===TYPE_JUDGE){
-      userAns = document.querySelector(`input[name="q${i}"]:checked`)?.value||"";
-    }else{
-      userAns = document.getElementById("blank"+i)?.value.trim()||"";
-    }
+    let userAns = examCache[nowPaperId][i] || "";
     if(userAns === q.answer) score++;
     else wrong.push({...q,user:currentUser.username});
   });
@@ -322,89 +578,152 @@ function submitExam(){
     time:new Date().toLocaleString()
   });
   wrongBooks.push(...wrong);
-  save();
-  alert(`提交成功！得分：${score}/${qs.length}`);
-  student();
+  delete examCache[nowPaperId];
+  Store.saveAll();
+  Modal("答题完成",`本次得分：${score}/${qs.length}<br>错题${wrong.length}道已存入错题本`,()=>student());
 }
-
 function myWrong(){
   let list = wrongBooks.filter(x=>x.user==currentUser.username);
-  let html = `<div class="card"><div class="title">错题本</div>`;
+  let html = `<div class="card"><div class="title">错题本（共${list.length}道）</div>`;
+  html += `<button class="btn btn-vip" onclick="genWrongPaper()">生成专属错题卷刷题</button>`;
   list.forEach((q,i)=>{
     let typeName = q.type==1?"单选":q.type==2?"判断":"填空";
-    html+=`<div class="item">【${typeName}】${i+1}. ${q.content}<br>正确答案：${q.answer}</div>`;
+    html+=`<div class="item">【${typeName}】${i+1}. ${q.content}<br>正确答案：${q.answer}<br><span class="tag">解析：${q.desc||"无"}</span></div>`;
   });
   html+=`<button class="btn btn-light" onclick="student()">返回</button></div>`;
   app.innerHTML=html;
 }
+function genWrongPaper(){
+    let myWrongList = wrongBooks.filter(x=>x.user==currentUser.username);
+    if(!myWrongList.length) return Toast("暂无错题");
+    let pid = genID();
+    papers.push({
+        id:pid,
+        title:`${currentUser.name}专属错题卷`,
+        sub:"math",
+        area:currentUser.area,
+        grade:currentUser.grade
+    })
+    myWrongList.forEach((q,i)=>{
+        questions.push({
+            id:genID()+i,
+            pid:pid,
+            type:q.type,
+            content:q.content,
+            op:q.op,
+            answer:q.answer,
+            knowledge:q.knowledge,
+            desc:q.desc
+        })
+    })
+    Store.saveAll();
+    Toast("错题试卷生成成功，可前往题库刷题");
+    student();
+}
 
-// ===================== 教师后台【重点修改邀请码】 =====================
+// ===================== 教师后台 =====================
 function adminLogin(){
+  if(!adminPwd){
+      app.innerHTML=`
+      <div class="card">
+        <div class="title">初始化管理员密码</div>
+        <input class="input" id="newAdminPwd" type="password" placeholder="设置后台登录密码">
+        <button class="btn" onclick="setAdminPwd()">保存密码并登录</button>
+        <button class="btn btn-light" onclick="home()">返回</button>
+      </div>`;
+      return;
+  }
   app.innerHTML=`
   <div class="card">
     <div class="title">后台登录</div>
-    <input class="input" id="pwd" type="password" placeholder="密码">
+    <input class="input" id="pwd" type="password" placeholder="管理员密码">
     <button class="btn" onclick="checkAdmin()">登录</button>
     <button class="btn btn-light" onclick="home()">返回</button>
   </div>`;
 }
+function setAdminPwd(){
+    let p = document.getElementById("newAdminPwd").value.trim();
+    if(p.length<4) return Toast("密码至少4位");
+    adminPwd = p;
+    Store.set("adminPwd",adminPwd);
+    Toast("密码设置完成");
+    adminLogin();
+}
 function checkAdmin(){
-  if(document.getElementById("pwd").value==ADMIN_PASS) admin();
-  else alert("密码错误");
+  if(document.getElementById("pwd").value == adminPwd){
+      Store.log("管理员登录后台");
+      admin();
+  }else Toast("密码错误");
 }
 function admin(){
   app.innerHTML=`
   <div class="card">
     <div class="title">管理后台</div>
+    <div class="tip tip-success">更新题库操作提示：修改完题目后【导出全部题库备份】，上传替换服务器cloud_lib.json，并把version.txt数字+1</div>
     <button class="btn btn-warning" onclick="checkPay()">付款审核</button>
-    <button class="btn" onclick="importPaper()">批量文本导入试卷(仅单选)</button>
+    <button class="btn" onclick="importPaper()">批量文本导入题目(单选/判断/填空模板)</button>
     <button class="btn btn-success" onclick="singleAddQ()">手动新增题目【单选/判断/填空】</button>
     <button class="btn" onclick="managePaper()">题库管理/修改题目</button>
-    <button class="btn" onclick="userManage()">用户管理</button>
-    <button class="btn" onclick="createNormalCode()">生成套餐邀请码</button>
+    <button class="btn" onclick="userManage()">用户管理(改会员/重置密码)</button>
+    <button class="btn" onclick="createNormalCode()">生成套餐邀请码(支持批量)</button>
     <button class="btn btn-vip" onclick="makeSeed()">生成种子永久邀请码</button>
-    <button class="btn btn-light" onclick="home()">退出</button>
+    <button class="btn btn-light" onclick="showOpLog()">查看操作日志</button>
+    <button class="btn btn-light" onclick="home()">退出后台</button>
   </div>`;
 }
-
-// ========== 新增：自选套餐生成普通邀请码 ==========
 function createNormalCode(){
   let optHtml = PACKAGES.map((item,idx)=>`<option value="${idx}">${item.name}(${item.days}天)</option>`).join("");
   app.innerHTML=`
   <div class="card">
     <div class="title">生成套餐邀请码</div>
-    <select class="input" id="selPkg">
-      ${optHtml}
-    </select>
-    <button class="btn btn-success" onclick="genOneCode()">生成单个邀请码</button>
+    <select class="input" id="selPkg">${optHtml}</select>
+    <input class="input" id="codeNum" value="1" placeholder="批量生成数量">
+    <div class="row">
+        <button class="btn btn-success" onclick="genBatchCode()">批量生成</button>
+        <button class="btn btn-light" onclick="viewAllCode()">查看全部邀请码</button>
+    </div>
     <button class="btn btn-light" onclick="admin()">返回后台</button>
   </div>`;
 }
-function genOneCode(){
+function genBatchCode(){
   let idx = Number(document.getElementById("selPkg").value);
+  let num = Number(document.getElementById("codeNum").value) || 1;
   let pkg = PACKAGES[idx];
-  let newCode = randCode();
-  codes.push({code:newCode,name:pkg.name,days:pkg.days,used:false});
-  save();
-  alert(`生成成功：${newCode}\n套餐：${pkg.name}，有效期${pkg.days}天`);
-  createNormalCode();
+  let out = [];
+  for(let i=0;i<num;i++){
+      let newCode = randCode();
+      codes.push({code:newCode,name:pkg.name,days:pkg.days,used:false});
+      out.push(newCode);
+  }
+  Store.saveAll();
+  Store.log(`批量生成${num}个${pkg.name}邀请码`);
+  Modal("生成完成",`生成码：${out.join(", ")}`,()=>createNormalCode());
 }
-
-// 生成种子永久码（独立，只进seedCodes）
+function viewAllCode(){
+    let unuse = codes.filter(x=>!x.used);
+    let used = codes.filter(x=>x.used);
+    let html = `<div class="card"><div class="title">全部邀请码</div>`;
+    html += `<div class="tip tip-success">未使用(${unuse.length})：${unuse.map(x=>x.code+"("+x.name+")").join("、")||"无"}</div>`;
+    html += `<div class="tip">已使用(${used.length})：${used.map(x=>x.code+"("+x.name+")").join("、")||"无"}</div>`;
+    html += `<button class="btn btn-light" onclick="createNormalCode()">返回</button></div>`;
+    app.innerHTML = html;
+}
 function makeSeed(){
   let code = randCode();
   seedCodes.push({code});
-  save();
-  alert("种子永久邀请码："+code);admin();
+  Store.saveAll();
+  Store.log(`生成种子永久邀请码：${code}`);
+  Modal("生成成功",`种子永久邀请码：${code}`,()=>admin());
 }
-
-// 付款审核通过自动生成对应套餐邀请码（不变）
 function checkPay(){
   let list = payApplys.filter(x=>x.status=="pending");
-  let html = `<div class="card"><div class="title">待审核</div>`;
+  let html = `<div class="card"><div class="title">待审核订单(${list.length})</div>`;
   list.forEach(x=>{
-    html+=`<div class="item">${x.nick} ${x.pkg} ¥${x.price}<button class="btn btn-success" onclick="passPay(${x.id})">通过发码</button></div>`;
-  });
+    html+=`<div class="item">
+        ${x.nick} ${x.phone} | ${x.pkg} ¥${x.price}
+        <button class="btn btn-success" onclick="passPay(${x.id})">通过发码</button>
+    </div>`;
+  })
   html+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;
   app.innerHTML=html;
 }
@@ -412,13 +731,14 @@ function passPay(id){
   let item = payApplys.find(x=>x.id==id);
   let code = randCode();
   codes.push({code,name:item.pkg,days:item.days,used:false});
-  item.status="pass";item.code=code;save();
-  alert("已通过！邀请码："+code);checkPay();
+  item.status="pass";item.code=code;
+  Store.saveAll();
+  Store.log(`审核通过订单${item.id}，发放邀请码${code}`);
+  Modal("审核通过",`已发放邀请码：${code}`,()=>checkPay());
 }
-
-// ========== 手动新增三种题型（不变） ==========
 function singleAddQ(){
   let paperOpt = papers.map(p=>`<option value="${p.id}">${p.title}【${p.area}${p.grade}】</option>`).join("");
+  let knowOpt = KNOWLEDGE.map(k=>`<option>${k}</option>`).join("");
   app.innerHTML=`
   <div class="card">
     <div class="title">手动新增题目</div>
@@ -430,7 +750,9 @@ function singleAddQ(){
       <option value="${TYPE_JUDGE}">判断题</option>
       <option value="${TYPE_BLANK}">填空题</option>
     </select>
+    <select class="input" id="qKnow">${knowOpt}</select>
     <textarea class="input" id="qContent" placeholder="填写题干"></textarea>
+    <textarea class="input" id="qDesc" placeholder="题目解析（选填）"></textarea>
 
     <div id="optBox">
       <input class="input" id="optA" placeholder="A选项">
@@ -449,63 +771,69 @@ function saveSingleQ(){
   let type = Number(document.getElementById("qType").value);
   let content = document.getElementById("qContent").value.trim();
   let ans = document.getElementById("rightAns").value.trim();
-  if(!pid||!content||!ans) return alert("试卷、题干、标准答案必填");
+  let know = document.getElementById("qKnow").value;
+  let desc = document.getElementById("qDesc").value.trim();
+  if(!pid||!content||!ans) return Toast("试卷、题干、标准答案必填");
 
-  let optArr = [];
+  let optArr = ["","","",""];
   if(type===TYPE_SEL){
     let a=document.getElementById("optA").value.trim();
     let b=document.getElementById("optB").value.trim();
     let c=document.getElementById("optC").value.trim();
     let d=document.getElementById("optD").value.trim();
-    if(!a||!b||!c||!d) return alert("单选四项选项必填");
+    if(!a||!b||!c||!d) return Toast("单选四项选项必填");
     optArr=[a,b,c,d];
-  }else{
-    optArr=["","","",""];
   }
 
   questions.push({
-    id:Date.now(),
+    id:genID(),
     pid:Number(pid),
     type:type,
     content:content,
     op:optArr,
-    answer:ans
+    answer:ans,
+    knowledge:know,
+    desc:desc
   });
-  save();
-  alert("保存成功，继续添加下一题");
+  Store.saveAll();
+  Toast("保存成功，继续添加");
   singleAddQ();
 }
-
-// 批量导入单选（原样不动）
 function importPaper(){
   app.innerHTML=`
   <div class="card">
-    <div class="title">批量导入单选</div>
-    <textarea class="input" id="txt" placeholder="粘贴单选文本"></textarea>
-    <button class="btn" onclick="parseTxt()">解析</button>
+    <div class="title">批量导入题目</div>
+    <div class="tip">
+    单选模板：<br>1.题干<br>A.xxx B.xxx C.xxx D.xxx<br>答案:A<br>
+    判断模板：<br>1.题干<br>答案:对<br>
+    填空模板：<br>1.题干___<br>答案:xx<br>
+    </div>
+    <textarea class="input" id="txt" placeholder="粘贴文本"></textarea>
+    <button class="btn" onclick="parseTxt()">解析文本</button>
     <button class="btn btn-light" onclick="admin()">返回</button>
   </div>`;
 }
 function parseTxt(){
   let txt = document.getElementById("txt").value;
   let lines = txt.split("\n").map(x=>x.trim()).filter(x=>x);
-  let list = [];
-  let title="",opt=[];
+  tempImport=[];
+  let cur = null;
   lines.forEach(line=>{
     if(/^\d+\./.test(line)){
-      if(title) list.push({type:TYPE_SEL,title,opt:[...opt]});
-      title = line.replace(/^\d+\./,"").trim();opt=[];
+        if(cur) tempImport.push(cur);
+        cur = {type:TYPE_SEL,title:line.replace(/^\d+\./,"").trim(),opt:[],ans:"",desc:"",knowledge:""};
     }
-    if(line.startsWith("A."))opt.push(line.slice(2).trim());
-    if(line.startsWith("B."))opt.push(line.slice(2).trim());
-    if(line.startsWith("C."))opt.push(line.slice(2).trim());
-    if(line.startsWith("D."))opt.push(line.slice(2).trim());
-  });
-  if(title) list.push({type:TYPE_SEL,title,opt:[...opt]});
-  tempImport=list;editPaper();
+    if(line.startsWith("A."))cur.opt[0]=line.slice(2).trim();
+    if(line.startsWith("B."))cur.opt[1]=line.slice(2).trim();
+    if(line.startsWith("C."))cur.opt[2]=line.slice(2).trim();
+    if(line.startsWith("D."))cur.opt[3]=line.slice(2).trim();
+    if(line.startsWith("答案:")) cur.ans = line.replace("答案:","").trim();
+  })
+  if(cur) tempImport.push(cur);
+  editPaper();
 }
 function editPaper(){
-  let html = `<div class="card"><div class="title">批量编辑单选</div>`;
+  let html = `<div class="card"><div class="title">批量编辑导入题目</div>`;
   tempImport.forEach((q,i)=>{
     html+=`<div class="item">
     <input class="input" id="t${i}" value="${q.title}">
@@ -513,12 +841,16 @@ function editPaper(){
     <input class="input" id="b${i}" value="${q.opt[1]||''}">
     <input class="input" id="c${i}" value="${q.opt[2]||''}">
     <input class="input" id="d${i}" value="${q.opt[3]||''}">
-    <input class="input" id="ans${i}" placeholder="答案A/B/C/D">
+    <input class="input" id="ans${i}" value="${q.ans}" placeholder="答案A/B/C/D/对/错">
     </div>`;
   });
+  let areaOpt = AREAS.map(a=>`<option>${a}</option>`).join("");
+  let gradeOpt = GRADES.map(g=>`<option>${g}</option>`).join("");
+  let knowOpt = KNOWLEDGE.map(k=>`<option>${k}</option>`).join("");
   html+=`
-  <select class="input" id="area">${AREAS.map(a=>`<option>${a}</option>`).join("")}</select>
-  <select class="input" id="grade">${GRADES.map(g=>`<option>${g}</option>`).join("")}</select>
+  <select class="input" id="area">${areaOpt}</select>
+  <select class="input" id="grade">${gradeOpt}</select>
+  <select class="input" id="know">${knowOpt}</select>
   <input class="input" id="title" placeholder="试卷名称">
   <button class="btn btn-success" onclick="savePaper()">保存入库</button>
   <button class="btn btn-light" onclick="admin()">返回</button></div>`;
@@ -527,8 +859,10 @@ function editPaper(){
 function savePaper(){
   let area=document.getElementById("area").value;
   let grade=document.getElementById("grade").value;
-  let title=document.getElementById("title").value;
-  let pid=Date.now();
+  let know = document.getElementById("know").value;
+  let title=document.getElementById("title").value.trim();
+  if(!title) return Toast("试卷名称不能为空");
+  let pid=genID();
   papers.push({id:pid,title,sub:"math",area,grade});
   tempImport.forEach((q,i)=>{
     let t=document.getElementById("t"+i).value;
@@ -536,35 +870,53 @@ function savePaper(){
     let b=document.getElementById("b"+i).value;
     let c=document.getElementById("c"+i).value;
     let d=document.getElementById("d"+i).value;
-    let ans=document.getElementById("ans"+i).value;
-    questions.push({id:Date.now()+i,pid,type:TYPE_SEL,content:t,op:[a,b,c,d],answer:ans});
+    let ans=document.getElementById("ans"+i).value.trim();
+    let type = ["对","错"].includes(ans) ? TYPE_JUDGE : (ans.length==1&&/[ABCD]/.test(ans) ? TYPE_SEL : TYPE_BLANK);
+    questions.push({
+        id:genID()+i,pid,type,content:t,op:[a,b,c,d],answer:ans,knowledge:know,desc:"批量导入题目"
+    });
   });
-  save();alert("保存成功");admin();
+  Store.saveAll();
+  Toast("试卷与题目导入完成");
+  admin();
 }
-
-// 题库修改（兼容三种题型）
 function managePaper(){
   let html = `<div class="card"><div class="title">题库管理</div>`;
+  html += `<input class="input" id="paperSearch" placeholder="搜索试卷">`;
   papers.forEach(p=>html+=`<div class="item" onclick="editQ(${p.id})">${p.title} ${p.area}${p.grade}</div>`);
   html+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;
   app.innerHTML=html;
+  document.getElementById("paperSearch").oninput = e=>{
+      let kw = e.target.value.toLowerCase();
+      let items = app.querySelectorAll(".item");
+      items.forEach(it=>{
+          let txt = it.innerText.toLowerCase();
+          it.style.display = txt.includes(kw) ? "block" : "none";
+      })
+  }
 }
 function editQ(pid){
   let qs = questions.filter(x=>x.pid==pid);
   let html = `<div class="card"><div class="title">修改题目</div>`;
   qs.forEach((q,i)=>{
     let tpName = q.type==1?"单选":q.type==2?"判断":"填空";
+    let knowOpt = KNOWLEDGE.map(k=>`<option ${q.knowledge==k?"selected":""}>${k}</option>`).join("");
     html+=`<div class="item"><div>【${tpName}】</div>
-    <input class="input" id="qc${i}" value="${q.content}">`;
+    <input class="input" id="qc${i}" value="${q.content}">
+    <select class="input" id="qk${i}">${knowOpt}</select>
+    <textarea class="input" id="qd${i}" placeholder="解析">${q.desc||""}</textarea>`;
     if(q.type===TYPE_SEL){
       html+=`
       <input class="input" id="qa${i}" value="${q.op[0]}">
       <input class="input" id="qb${i}" value="${q.op[1]}">
       <input class="input" id="qcc${i}" value="${q.op[2]}">
-      <input class="input" id="qd${i}" value="${q.op[3]}">`;
+      <input class="input" id="qdopt${i}" value="${q.op[3]}">`;
     }
     html+=`<input class="input" id="qans${i}" value="${q.answer}" placeholder="答案">
-    <button class="btn" onclick="updateQ(${q.id},${i},${q.type})">保存修改</button>
+    <div class="row">
+        <button class="btn" onclick="updateQ(${q.id},${i},${q.type})">保存修改</button>
+        <button class="btn btn-danger" onclick="delQ(${q.id})">删除题目</button>
+    </div>
     </div>`;
   });
   html+=`<button class="btn btn-light" onclick="managePaper()">返回</button></div>`;
@@ -573,28 +925,90 @@ function editQ(pid){
 function updateQ(qid,i,tp){
   let q = questions.find(x=>x.id==qid);
   q.content = document.getElementById("qc"+i).value;
-  q.answer = document.getElementById("qans"+i).value;
+  q.knowledge = document.getElementById("qk"+i).value;
+  q.desc = document.getElementById("qd"+i).value.trim();
+  q.answer = document.getElementById("qans"+i).value.trim();
   if(tp===TYPE_SEL){
     q.op = [
       document.getElementById("qa"+i).value,
       document.getElementById("qb"+i).value,
       document.getElementById("qcc"+i).value,
-      document.getElementById("qd"+i).value
+      document.getElementById("qdopt"+i).value
     ];
   }
-  save();alert("修改完成");
+  Store.saveAll();
+  Toast("修改已保存");
 }
-
+function delQ(qid){
+    Modal("确认删除","删除后无法恢复该题目",()=>{
+        questions = questions.filter(x=>x.id !== qid);
+        Store.saveAll();
+        Toast("删除成功");
+        managePaper();
+    })
+}
+// 用户管理：重置密码、修改会员时长
 function userManage(){
-  let html = `<div class="card"><div class="title">用户列表</div>`;
+  let html = `<div class="card"><div class="title">用户管理</div>`;
+  html += `<input class="input" id="userSearch" placeholder="搜索学生姓名/账号">`;
   users.forEach(u=>{
     let left = u.regDay+u.validDays-day();
-    html+=`<div class="item">${u.name} ${u.area}${u.grade} 剩余${left}天</div>`;
+    html+=`<div class="item" data-name="${u.name.toLowerCase()}" data-acc="${u.username.toLowerCase()}">
+    ${u.name}(${u.username}) ${u.area}${u.grade} 剩余${left}天会员【${u.vipType}】
+    <div class="row">
+        <button class="btn" onclick="resetPwd('${u.username}')">重置密码</button>
+        <button class="btn btn-success" onclick="editUserVip('${u.username}')">调整会员时长</button>
+    </div>
+    </div>`;
   });
   html+=`<button class="btn btn-light" onclick="admin()">返回</button></div>`;
   app.innerHTML=html;
+  document.getElementById("userSearch").oninput = e=>{
+      let kw = e.target.value.toLowerCase();
+      let items = app.querySelectorAll(".item");
+      items.forEach(it=>{
+          let n = it.dataset.name;
+          let a = it.dataset.acc;
+          it.style.display = n.includes(kw)||a.includes(kw) ? "block" : "none";
+      })
+  }
+}
+function resetPwd(acc){
+    let u = users.find(x=>x.username == acc);
+    Modal("重置密码",`为${u.name}设置新密码：<input class="input" id="newPwd">`,()=>{
+        let p = document.getElementById("newPwd").value.trim();
+        if(!p) return Toast("密码不能为空");
+        u.password = p;
+        Store.saveAll();
+        Toast("密码重置完成");
+        userManage();
+    })
+}
+function editUserVip(acc){
+    let u = users.find(x=>x.username == acc);
+    Modal("调整会员时长",`当前剩余${u.regDay+u.validDays-day()}天<br>增加天数：<input class="input" id="addDay" value="30">`,()=>{
+        let add = Number(document.getElementById("addDay").value);
+        if(isNaN(add)||add<=0) return Toast("天数错误");
+        u.validDays += add;
+        Store.saveAll();
+        Toast("会员时长已增加");
+        userManage();
+    })
+}
+// 查看操作日志
+function showOpLog(){
+    let logStr = opLogs.map(x=>`[${x.time}] ${x.content}`).join("\n");
+    app.innerHTML = `
+    <div class="card">
+        <div class="title">系统操作日志</div>
+        <textarea class="input" readonly style="height:400px">${logStr||"暂无操作记录"}</textarea>
+        <button class="btn btn-light" onclick="admin()">返回</button>
+    </div>`
 }
 
+// 页面容器快捷变量
+const app = document.getElementById("app");
+// 初始化首页
 home();
 </script>
 </body>
