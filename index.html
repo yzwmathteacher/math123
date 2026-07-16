@@ -49,9 +49,11 @@
 <script>
 // =====================【必须修改这里！替换成你的服务器公网IP】=====================
 const API_BASE = "http://119.91.49.72:5000";
+// =====================【管理员后台固定密码，自行修改】=====================
+const ADMIN_FIX_PWD = "teacher123";
 // ==============================================================================
 const Store = {
-    keyList: ["users","papers","questions","wrongBooks","examHistory","codes","seedCodes","payApplys","adminPwd","opLogs"],
+    keyList: ["users","papers","questions","wrongBooks","examHistory","codes","seedCodes","payApplys","opLogs"],
     getLocalDbVer(){return parseInt(localStorage.getItem("localDbVer") || "0");},
     setLocalDbVer(v){localStorage.setItem("localDbVer", String(v));},
     encode(str){return btoa(unescape(encodeURIComponent(str)));},
@@ -142,7 +144,7 @@ function Toast(msg){
 let users=Store.get("users");let papers=Store.get("papers");let questions=Store.get("questions");
 let wrongBooks=Store.get("wrongBooks");let examHistory=Store.get("examHistory");
 let codes=Store.get("codes");let seedCodes=Store.get("seedCodes");let payApplys=Store.get("payApplys");
-let opLogs=Store.get("opLogs");let adminPwd=Store.get("adminPwd")||"";
+let opLogs=Store.get("opLogs");
 let currentUser=null;let nowPaperId=0;let tempImport=[];let examCache={};const PAGE_SIZE=20;
 function checkUserExpire(){
     if(!currentUser)return false;
@@ -153,12 +155,10 @@ function checkUserExpire(){
 }
 function home(){
     checkDbUpdate();
-    let tipHtml=adminPwd?"":`<div class="tip tip-success">首次使用，请先进入教师后台设置管理员密码</div>`;
     app.innerHTML=`
     <div class="card">
         <div class="title">大湾区全科智能刷题系统</div>
         <div class="sub-title">同步云端最新题库，自动更新试卷</div>
-        ${tipHtml}
         <button class="btn" onclick="login()">学生登录</button>
         <button class="btn" onclick="reg()">新用户注册</button>
         <button class="btn btn-warning" onclick="payPage()">开通会员</button>
@@ -416,17 +416,9 @@ function createWrongPaper(){
     });
     Store.saveAll();Toast("错题试卷生成完成，题库列表可打开刷题");openPaperList();
 }
-// ==========教师后台模块==========
+// ==========教师后台模块【修复强制密码校验，无免密漏洞】==========
 function adminLogin(){
-    if(!adminPwd){
-        app.innerHTML=`
-        <div class="card">
-            <div class="title">初始化管理员密码</div>
-            <input class="input" id="newAdminPwd" type="password" placeholder="设置后台登录密码">
-            <button class="btn" onclick="saveAdminPwd()">保存密码并登录后台</button>
-            <button class="btn btn-light" onclick="home()">返回首页</button>
-        </div>`;return;
-    }
+    // 强制每次进入后台都弹出密码输入框，无任何免密通道
     app.innerHTML=`
     <div class="card">
         <div class="title">教师后台登录</div>
@@ -435,15 +427,17 @@ function adminLogin(){
         <button class="btn btn-light" onclick="home()">返回首页</button>
     </div>`;
 }
-function saveAdminPwd(){
-    let p=document.getElementById("newAdminPwd").value.trim();
-    if(p.length<4)return Toast("密码至少4位");
-    adminPwd=p;Store.set("adminPwd",adminPwd);Toast("密码设置成功");adminLogin();
-}
 function doAdminLogin(){
-    let p=document.getElementById("adminPwdInput").value.trim();
-    if(p!=adminPwd)return Toast("管理员密码错误");
-    Store.log("管理员登录后台");adminPanel();
+    let inputPwd = document.getElementById("adminPwdInput").value.trim();
+    if(inputPwd !== ADMIN_FIX_PWD){
+        Toast("管理员密码错误，禁止进入后台");
+        return;
+    }
+    Store.log("管理员登录后台");
+    Toast("登录成功，正在进入管理后台");
+    setTimeout(()=>{
+        adminPanel();
+    },500);
 }
 function adminPanel(){
     app.innerHTML=`
