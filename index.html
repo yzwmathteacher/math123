@@ -47,13 +47,14 @@
 <div class="container" id="app"></div>
 
 <script>
-// =====================【必须修改这里！替换成你的服务器公网IP】=====================
+// =====================【服务器公网IP】=====================
 const API_BASE = "http://119.91.49.72:5000";
-// =====================【管理员后台固定密码，自行修改】=====================
+// =====================【教师后台固定密码】=====================
 const ADMIN_FIX_PWD = "teacher123";
+const ADMIN_KEY = "teacher123";
 // ==============================================================================
 const Store = {
-    keyList: ["users","papers","questions","wrongBooks","examHistory","codes","seedCodes","payApplys","opLogs"],
+    keyList: ["papers","questions","localDbVer"],
     getLocalDbVer(){return parseInt(localStorage.getItem("localDbVer") || "0");},
     setLocalDbVer(v){localStorage.setItem("localDbVer", String(v));},
     encode(str){return btoa(unescape(encodeURIComponent(str)));},
@@ -74,6 +75,8 @@ const Store = {
     },
     exportAll(){
         let all={};this.keyList.forEach(k=>all[k]=this.get(k));
+        all.users=users;all.wrongBooks=wrongBooks;all.examHistory=examHistory;
+        all.codes=codes;all.seedCodes=seedCodes;all.payApplys=payApplys;all.opLogs=opLogs;
         let blob=new Blob([JSON.stringify(all,null,2)],{type:"application/json"});
         let a=document.createElement("a");a.href=URL.createObjectURL(blob);
         a.download=`大湾区题库备份_${new Date().toLocaleDateString()}.json`;a.click();
@@ -84,15 +87,12 @@ const Store = {
             try{
                 let d=JSON.parse(e.target.result);
                 Object.keys(d).forEach(k=>{if(this.keyList.includes(k))window[k]=d[k];});
+                users=d.users||[];wrongBooks=d.wrongBooks||[];examHistory=d.examHistory||[];
+                codes=d.codes||[];seedCodes=d.seedCodes||[];payApplys=d.payApplys||[];opLogs=d.opLogs||[];
                 this.saveAll();cb(true,"本地备份导入成功");
             }catch(err){cb(false,"文件损坏，导入失败");}
         };
         fr.readAsText(fileObj);
-    },
-    log(text){
-        let logs=this.get("opLogs");
-        logs.push({time:new Date().toLocaleString(),content:text});
-        window.opLogs=logs;this.set("opLogs",logs);
     }
 };
 async function checkDbUpdate(){
@@ -141,10 +141,9 @@ function Toast(msg){
     div.innerText=msg;document.body.appendChild(div);
     setTimeout(()=>div.remove(),1500);
 }
-let users=Store.get("users");let papers=Store.get("papers");let questions=Store.get("questions");
-let wrongBooks=Store.get("wrongBooks");let examHistory=Store.get("examHistory");
-let codes=Store.get("codes");let seedCodes=Store.get("seedCodes");let payApplys=Store.get("payApplys");
-let opLogs=Store.get("opLogs");
+let papers=Store.get("papers");let questions=Store.get("questions");
+let users=[];let wrongBooks=[];let examHistory=[];
+let codes=[];let seedCodes=[];let payApplys=[];let opLogs=[];
 let currentUser=null;let nowPaperId=0;let tempImport=[];let examCache={};const PAGE_SIZE=20;
 function checkUserExpire(){
     if(!currentUser)return false;
@@ -180,27 +179,35 @@ function uploadLocalBackup(){
 function login(){
     app.innerHTML=`
     <div class="card">
-        <div class="title">学生登录</div>
+        <div class="title">学生登录（云端同步数据）</div>
         <input class="input" id="uName" placeholder="登录账号">
         <input class="input" id="uPwd" type="password" placeholder="登录密码">
         <button class="btn" onclick="doLogin()">登录系统</button>
         <button class="btn btn-light" onclick="home()">返回首页</button>
     </div>`;
 }
-function doLogin(){
+async function doLogin(){
     let un=document.getElementById("uName").value.trim();
     let pw=document.getElementById("uPwd").value.trim();
     if(!un||!pw)return Toast("账号密码不能为空");
-    let u=users.find(x=>x.username===un&&x.password===pw);
-    if(!u)return Toast("账号或密码错误");
-    currentUser=u;Store.log(`用户登录：${un} ${u.name}`);studentCenter();
+    let res=await fetch(`${API_BASE}/api/user_login`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({username:un,password:pw})
+    });
+    let data=await res.json();
+    if(data.code!==200)return Toast(data.msg);
+    currentUser=data.user;
+    wrongBooks=data.wrongBooks;
+    examHistory=data.examHistory;
+    Toast("登录成功，已同步云端错题与答题记录");
+    studentCenter();
 }
 function reg(){
     let areaOpt=AREAS.map(a=>`<option>${a}</option>`).join("");
     let gradeOpt=GRADES.map(g=>`<option>${g}</option>`).join("");
     app.innerHTML=`
     <div class="card">
-        <div class="title">新用户注册</div>
+        <div class="title">新用户注册（数据自动存云端）</div>
         <input class="input" id="rUser" placeholder="自定义登录账号">
         <input class="input" id="rPwd" type="password" placeholder="登录密码">
         <input class="input" id="rName" placeholder="学生姓名">
@@ -211,7 +218,7 @@ function reg(){
         <button class="btn btn-light" onclick="home()">返回首页</button>
     </div>`;
 }
-function doReg(){
+async function doReg(){
     let user=document.getElementById("rUser").value.trim();
     let pwd=document.getElementById("rPwd").value.trim();
     let name=document.getElementById("rName").value.trim();
@@ -219,7 +226,6 @@ function doReg(){
     let grade=document.getElementById("rGrade").value;
     let code=document.getElementById("rCode").value.trim();
     if(!user||!pwd||!name||!code)return Toast("全部信息必填");
-    if(users.find(x=>x.username===user))return Toast("账号已被注册");
     let seed=seedCodes.find(x=>x.code===code);
     let useCode=codes.find(x=>x.code===code&&x.used===false);
     let vipDay=0;let vipType="普通用户";
@@ -227,11 +233,16 @@ function doReg(){
     else if(useCode){
         vipDay=useCode.days;vipType=useCode.name;useCode.used=true;
     }else return Toast("邀请码无效或已使用");
-    users.push({
-        username:user,password:pwd,name:name,area:area,grade:grade,
-        regDay:day(),validDays:vipDay,vipType:vipType
+    let regDay=day();
+    let res=await fetch(`${API_BASE}/api/user_reg`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({username:user,password:pwd,name,area,grade,regDay,validDays:vipDay,vipType})
     });
-    Store.saveAll();Toast("注册成功，请登录");login();
+    let ret=await res.json();
+    if(ret.code!==200)return Toast(ret.msg);
+    await adminUploadTable("codes",codes);
+    await adminUploadTable("seedCodes",seedCodes);
+    Toast("注册成功，请登录");login();
 }
 function payPage(){
     let listHtml=PACKAGES.map(item=>`
@@ -250,12 +261,13 @@ function payPage(){
         <button class="btn btn-light" onclick="home()">返回首页</button>
     </div>`;
 }
-function submitPay(days,price){
+async function submitPay(days,price){
     let name=document.getElementById("payName").value.trim();
     let phone=document.getElementById("payPhone").value.trim();
     if(!name||!phone)return Toast("填写学生姓名和家长手机号");
     payApplys.push({id:genID(),studentName:name,phone:phone,days:days,price:price,status:"pending",time:new Date().toLocaleString()});
-    Store.saveAll();Toast("申请提交成功，等待老师审核发放邀请码");home();
+    await adminUploadTable("payApplys",payApplys);
+    Toast("申请提交成功，等待老师审核发放邀请码");home();
 }
 function studentCenter(){
     if(!checkUserExpire())return;
@@ -267,8 +279,14 @@ function studentCenter(){
         <button class="btn" onclick="openPaperList()">开始刷题</button>
         <button class="btn btn-success" onclick="showScoreChart()">学习成绩统计</button>
         <button class="btn btn-warning" onclick="showWrongBook()">错题本</button>
-        <button class="btn btn-light" onclick="currentUser=null;home()">退出登录</button>
+        <button class="btn btn-light" onclick="asyncLogout()">退出登录</button>
     </div>`;
+}
+async function asyncLogout(){
+    currentUser=null;
+    wrongBooks=[];
+    examHistory=[];
+    home();
 }
 function openPaperList(){
     if(!checkUserExpire())return;
@@ -346,7 +364,7 @@ function saveTempCache(pid){
     });
     Toast("答案已本地暂存");openPaperList();
 }
-function submitAllPaper(pid){
+async function submitAllPaper(pid){
     let allQ=questions.filter(q=>q.pid==pid);
     allQ.forEach((q,i)=>{
         let sel=document.querySelector(`input[name="q${i}"]:checked`);
@@ -362,9 +380,18 @@ function submitAllPaper(pid){
     });
     let totalNum=allQ.length;
     examHistory.push({user:currentUser.username,pid:pid,paperName:papers.find(p=>p.id==pid).title,score:score,total:totalNum,time:new Date().toLocaleString()});
-    wrongArr.forEach(item=>wrongBooks.push(item));
-    delete examCache[pid];Store.saveAll();
-    Modal("答题完成",`总分：${score}/${totalNum}<br>错题${wrongArr.length}道已存入错题本`,()=>studentCenter());
+    wrongBooks=wrongBooks.filter(w=>!(w.pid==pid&&w.user==currentUser.username));
+    wrongBooks.push(...wrongArr);
+    delete examCache[pid];
+    await fetch(`${API_BASE}/api/save_wrong`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(wrongBooks.filter(w=>w.user==currentUser.username))
+    });
+    await fetch(`${API_BASE}/api/save_exam`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(examHistory.filter(h=>h.user==currentUser.username))
+    });
+    Modal("答题完成",`总分：${score}/${totalNum}<br>错题${wrongArr.length}道已存入云端错题本`,()=>studentCenter());
 }
 function showScoreChart(){
     let myHis=examHistory.filter(h=>h.user==currentUser.username);
@@ -373,7 +400,7 @@ function showScoreChart(){
     let data=myHis.map(h=>h.score);
     app.innerHTML=`
     <div class="card">
-        <div class="title">历史得分统计</div>
+        <div class="title">历史得分统计（云端数据）</div>
         <div class="chart-box"><canvas id="scoreCanvas"></canvas></div>
         <button class="btn btn-light" onclick="studentCenter()">返回</button>
     </div>`;
@@ -396,7 +423,7 @@ function showWrongBook(){
     </div>`).join("");
     app.innerHTML=`
     <div class="card">
-        <div class="title">我的错题本（共${myWrong.length}道）</div>
+        <div class="title">我的错题本（云端同步，共${myWrong.length}道）</div>
         <button class="btn btn-vip" onclick="createWrongPaper()">生成错题专项试卷</button>
         ${html}
         <button class="btn btn-light" onclick="studentCenter()">返回</button>
@@ -416,9 +443,8 @@ function createWrongPaper(){
     });
     Store.saveAll();Toast("错题试卷生成完成，题库列表可打开刷题");openPaperList();
 }
-// ==========教师后台模块【修复强制密码校验，无免密漏洞】==========
+// ==========教师后台模块【强制密码校验+云端数据同步】==========
 function adminLogin(){
-    // 强制每次进入后台都弹出密码输入框，无任何免密通道
     app.innerHTML=`
     <div class="card">
         <div class="title">教师后台登录</div>
@@ -427,22 +453,45 @@ function adminLogin(){
         <button class="btn btn-light" onclick="home()">返回首页</button>
     </div>`;
 }
-function doAdminLogin(){
+async function doAdminLogin(){
     let inputPwd = document.getElementById("adminPwdInput").value.trim();
     if(inputPwd !== ADMIN_FIX_PWD){
         Toast("管理员密码错误，禁止进入后台");
         return;
     }
+    let res=await fetch(`${API_BASE}/api/admin_get?key=${ADMIN_KEY}`);
+    let data=await res.json();
+    if(data.code===403)return Toast("密钥校验失败");
+    users=data.users;
+    codes=data.codes;
+    seedCodes=data.seedCodes;
+    payApplys=data.payApplys;
+    opLogs=data.opLogs;
     Store.log("管理员登录后台");
-    Toast("登录成功，正在进入管理后台");
+    await saveOpLog("管理员登录后台");
+    Toast("登录成功，已拉取云端管理数据");
     setTimeout(()=>{
         adminPanel();
     },500);
 }
+async function adminUploadTable(tableName,arr){
+    await fetch(`${API_BASE}/api/admin_sync`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({key:ADMIN_KEY,table:tableName,data:arr})
+    });
+}
+async function saveOpLog(text){
+    let t=new Date().toLocaleString();
+    opLogs.push({time:t,content:text});
+    await fetch(`${API_BASE}/api/save_log`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({time:t,content:text})
+    });
+}
 function adminPanel(){
     app.innerHTML=`
     <div class="card">
-        <div class="title">教师题库管理后台</div>
+        <div class="title">教师题库管理后台（云端存储）</div>
         <div class="tip tip-success">更新题库操作：修改题目后点【导出全部题库备份】，上传替换服务器cloud_lib.json，version.txt数字+1</div>
         <button class="btn btn-warning" onclick="showPayAudit()">会员开通审核</button>
         <button class="btn" onclick="batchImportQ()">批量导入题目</button>
@@ -470,11 +519,14 @@ function showPayAudit(){
         <button class="btn btn-light" onclick="adminPanel()">返回后台</button>
     </div>`;
 }
-function auditPass(aid,days){
+async function auditPass(aid,days){
     let item=payApplys.find(p=>p.id==aid);
     let newCode=randCode();
     codes.push({code:newCode,days:days,name:`${days}天会员`,used:false});
-    item.status="pass";item.outCode=newCode;Store.saveAll();
+    item.status="pass";item.outCode=newCode;
+    await adminUploadTable("codes",codes);
+    await adminUploadTable("payApplys",payApplys);
+    await saveOpLog(`审核会员申请，生成邀请码${newCode}`);
     Modal("审核完成",`已生成邀请码：${newCode}，发给家长注册使用`,()=>showPayAudit());
 }
 function codeManage(){
@@ -483,7 +535,7 @@ function codeManage(){
     let useHtml=used.length==0?"无已使用邀请码":used.map(c=>`${c.code}(${c.name})`).join("、");
     app.innerHTML=`
     <div class="card">
-        <div class="title">邀请码管理</div>
+        <div class="title">邀请码管理（云端保存）</div>
         <input class="input" id="genNum" value="5" placeholder="批量生成数量">
         <select class="input" id="codeDay">
             <option value="1">体验1天</option>
@@ -498,7 +550,7 @@ function codeManage(){
         <button class="btn btn-light" onclick="adminPanel()">返回后台</button>
     </div>`;
 }
-function batchGenCode(){
+async function batchGenCode(){
     let num=Number(document.getElementById("genNum").value);
     let day=Number(document.getElementById("codeDay").value);
     if(num<1||num>50)return Toast("生成数量1-50之间");
@@ -509,7 +561,9 @@ function batchGenCode(){
         codes.push({code:c,days:day,name:nameObj[day],used:false});
         outArr.push(c);
     }
-    Store.saveAll();Modal("生成完成",`新邀请码：${outArr.join("、")}`,()=>codeManage());
+    await adminUploadTable("codes",codes);
+    await saveOpLog(`批量生成邀请码：${outArr.join("、")}`);
+    Modal("生成完成",`新邀请码：${outArr.join("、")}`,()=>codeManage());
 }
 function addSingleQ(){
     let areaOpt=AREAS.map(a=>`<option>${a}</option>`).join("");
@@ -562,7 +616,7 @@ function saveSingleQuestion(){
     questions.push({
         id:genID(),pid:Number(pid),type:type,content:content,op:optArr,answer:ans,knowledge:know,desc:desc
     });
-    Store.saveAll();Toast("题目保存成功，导出备份更新云端题库");addSingleQ();
+    Store.saveAll();Toast("题目保存成功，导出备份同步云端题库");addSingleQ();
 }
 function batchImportQ(){
     app.innerHTML=`
@@ -602,7 +656,7 @@ function parseBatchText(){
         let t=["对","错"].includes(item.ans)?TYPE_JUDGE:(/^[ABCD]$/.test(item.ans)?TYPE_SEL:TYPE_BLANK);
         questions.push({id:genID(),pid:pid,type:t,content:item.title,op:item.opt,answer:item.ans,knowledge:"通用",desc:"批量导入"});
     });
-    Store.saveAll();Toast(`成功导入${tempImport.length}道题目，导出备份同步云端`);batchImportQ();
+    Store.saveAll();Toast(`成功导入${tempImport.length}道题目，导出备份同步云端题库`);batchImportQ();
 }
 function manageAllPaper(){
     let paperHtml=papers.map(p=>`
@@ -676,33 +730,37 @@ function userList(){
     }).join("");
     app.innerHTML=`
     <div class="card">
-        <div class="title">全部注册学生用户</div>
+        <div class="title">全部注册学生用户（云端）</div>
         ${userHtml}
         <button class="btn btn-light" onclick="adminPanel()">返回后台</button>
     </div>`;
 }
-function resetUserPwd(un){
+async function resetUserPwd(un){
     let u=users.find(x=>x.username==un);
-    Modal("重置用户密码",`为学生${u.name}设置新密码：<input class="input" id="newUserPwd">`,()=>{
+    Modal("重置用户密码",`为学生${u.name}设置新密码：<input class="input" id="newUserPwd">`,async ()=>{
         let np=document.getElementById("newUserPwd").value.trim();
         if(!np)return Toast("密码不能为空");
-        u.password=np;Store.saveAll();Toast("密码重置成功");userList();
+        u.password=np;
+        await adminUploadTable("users",users);
+        Toast("密码重置成功");userList();
     });
 }
-function addUserVip(un){
+async function addUserVip(un){
     let u=users.find(x=>x.username==un);
     let left=u.regDay+u.validDays-day();
-    Modal("增加会员时长",`${u.name}当前剩余${left}天<br>增加天数：<input class="input" id="addVipDay" value="30">`,()=>{
+    Modal("增加会员时长",`${u.name}当前剩余${left}天<br>增加天数：<input class="input" id="addVipDay" value="30">`,async ()=>{
         let add=Number(document.getElementById("addVipDay").value);
         if(isNaN(add)||add<=0)return Toast("填写有效天数");
-        u.validDays+=add;Store.saveAll();Toast("会员时长增加完成");userList();
+        u.validDays+=add;
+        await adminUploadTable("users",users);
+        Toast("会员时长增加完成");userList();
     });
 }
 function showLog(){
     let logText=opLogs.map(l=>`[${l.time}] ${l.content}`).join("\n");
     app.innerHTML=`
     <div class="card">
-        <div class="title">系统全部操作日志</div>
+        <div class="title">系统全部操作日志（云端）</div>
         <textarea class="input" readonly style="height:400px;">${logText||"暂无操作记录"}</textarea>
         <button class="btn btn-light" onclick="adminPanel()">返回后台</button>
     </div>`;
